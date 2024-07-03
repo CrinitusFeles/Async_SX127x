@@ -12,10 +12,10 @@ from async_sx127x.registers_and_params import (SX127x_BW, SX127x_CR,
                                             SX127x_Modulation)
 
 
-def sleep(timeout: float):
+async def sleep(timeout: float):
     counter = 0
     while counter < timeout:
-        time.sleep(0.01)
+        await asyncio.sleep(0.01)
         counter += 0.01
 
 async def ainput(prompt: str = "") -> str:
@@ -28,7 +28,7 @@ class RadioController(SX127x_Driver):
         self.coding_rate: SX127x_CR = kwargs.get('ecr', self.cr.CR5)  # error coding rate
         self.bandwidth: SX127x_BW = kwargs.get('bw', self.bw.BW250)  # bandwidth  BW250
         self.spread_factor: int = kwargs.get('sf', 10)  # spreading factor  SF10
-        self.frequency: int = kwargs.get('frequency', 401_500_000)   # 436700000
+        self.frequency: int = kwargs.get('frequency', 433_000_000)   # 436700000
         self.crc_mode: bool = kwargs.get('crc_mode', True)  # check crc
         self.tx_power: int = kwargs.get('tx_power', 17)  # dBm
         self.sync_word: int = kwargs.get('sync_word', 0x12)
@@ -130,7 +130,7 @@ class RadioController(SX127x_Driver):
 
     async def connect(self, port_or_ip: str) -> bool:
         if await super().connect(port_or_ip):
-            time.sleep(0.1)
+            await asyncio.sleep(0.1)
             logger.success(f'Radio {self.label} connected.\nStart initialization...')
             await self.init()
             logger.success(f'Radio {self.label} inited.')
@@ -152,7 +152,7 @@ class RadioController(SX127x_Driver):
             logger.debug(tx_chunk)
             await self.write_fifo(chunk, is_implicit)
             await self.interface.run_tx_then_rx_cont()
-            time.sleep((tx_chunk.Tpkt + 10) / 1000)
+            await asyncio.sleep((tx_chunk.Tpkt + 10) / 1000)
 
     async def send_single(self, data: bytes,
                           caller_name: str = '') -> LoRaTxPacket:
@@ -166,8 +166,10 @@ class RadioController(SX127x_Driver):
         else:
             is_implicit: bool = (self.header_mode == SX127x_HeaderMode.IMPLICIT)
             await self.write_fifo(data, is_implicit)
+            # print(await self.interface.read(0x0D))
+            # print(await self.interface.read_several(0, 15))
             await self.interface.run_tx_then_rx_cont()
-            time.sleep((tx_pkt.Tpkt) / 1000)
+            await asyncio.sleep((tx_pkt.Tpkt) / 1000)
             await self.reset_irq_flags()
 
         self.transmited.emit(tx_pkt)
@@ -309,13 +311,14 @@ class RadioController(SX127x_Driver):
         self.clear_subscribers()
 
     async def rx_routine(self) -> None:
-        while not self._keep_running:
+        self._keep_running = True
+        while self._keep_running:
             pkt: LoRaRxPacket | None = await self.check_rx_input()
             if pkt is not None:
                 logger.debug(pkt)
                 self.received.emit(pkt)
                 self.received_raw.emit(pkt.to_bytes())
-            time.sleep(0.01)
+            await asyncio.sleep(0.01)
 
     async def set_frequency(self, new_freq_hz: int) -> None:
         await super().set_frequency(new_freq_hz)
@@ -332,7 +335,7 @@ class RadioController(SX127x_Driver):
                     bdata = bytes(list_data)
                     await self.send_single(bdata)
                 except (SyntaxError, ValueError):
-                    await self.send_single(data.encode() + b'\n\r')
+                    await self.send_single(data.encode())
 
         except KeyboardInterrupt:
             self.disconnect()
@@ -346,7 +349,7 @@ def on_received(data: LoRaRxPacket):
         print(err)
 
 async def test():
-    lora: RadioController = RadioController(interface='Serial', tx_power=2)
+    lora: RadioController = RadioController(interface='Serial', tx_power=18)
     if await lora.connect(port_or_ip='COM25'):  # 192.168.0.5
         print(await lora.read_config())
         rx_task = lora.rx_routine()

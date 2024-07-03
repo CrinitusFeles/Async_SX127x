@@ -1,5 +1,5 @@
 from __future__ import annotations
-import time
+import asyncio
 from typing import Any, Callable, Coroutine
 from loguru import logger
 
@@ -17,7 +17,7 @@ async def retry(func: Callable[..., Coroutine], counter: int):
         data = await func()
         if data != b'':
             break
-        time.sleep(0.15)
+        await asyncio.sleep(0.15)
         logger.error('read empty bytes')
         counter -= 1
     return data

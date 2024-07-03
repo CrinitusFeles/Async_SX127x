@@ -1,6 +1,6 @@
 from __future__ import annotations
 import math
-from typing import Callable, Literal
+from typing import Literal
 from loguru import logger
 from async_sx127x.interfaces.base_interface import BaseInterface
 from async_sx127x.interfaces.ethernet import EthernetInterface
