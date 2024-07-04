@@ -1,7 +1,6 @@
 from __future__ import annotations
 import asyncio
 from datetime import datetime, UTC
-import time
 from ast import literal_eval
 from loguru import logger
 from event import Event
@@ -61,28 +60,30 @@ class RadioController(SX127x_Driver):
         self.tx_timeout.subscribers.clear()
         self._last_caller: str = ''
 
-    async def init(self) -> None:
-        await self.interface.reset()
-        await asyncio.sleep(0.1)
-        await self.set_modulation(self.modulation)
-        await self.set_lora_header_mode(self.header_mode)
-        if self.header_mode == SX127x_HeaderMode.IMPLICIT:
-            await self.set_lora_payload_length(self.payload_length)
-        await self.set_lora_coding_rate(self.coding_rate)
-        await self.set_lora_bandwidth(self.bandwidth)
-        await self.set_lora_sf(self.spread_factor)
-        await self.set_lora_crc_mode(self.crc_mode)
-        await self.set_tx_power(self.tx_power)
-        await self.set_lora_sync_word(self.sync_word)
-        await self.set_lora_preamble_length(self.preamble_length)
-        await self.set_lora_auto_gain_control(self.auto_gain_control)
-        # if not self.auto_gain_control:
-        await self.set_low_noize_amplifier(self.low_noize_amplifier, self.lna_boost)
-        await self.set_lora_rx_tx_fifo_base_addr(0, 0)
-        await self.set_frequency(self.frequency)
-        await self.set_low_data_rate_optimize(self.low_data_rate_optimize)
-        if not self.only_tx:
-            await self.to_receive_mode()
+    async def init(self, condition: asyncio.Condition) -> bool:
+        async with condition:
+            await self.interface.reset()
+            await asyncio.sleep(0.1)
+            await self.set_modulation(self.modulation)
+            await self.set_lora_header_mode(self.header_mode)
+            if self.header_mode == SX127x_HeaderMode.IMPLICIT:
+                await self.set_lora_payload_length(self.payload_length)
+            await self.set_lora_coding_rate(self.coding_rate)
+            await self.set_lora_bandwidth(self.bandwidth)
+            await self.set_lora_sf(self.spread_factor)
+            await self.set_lora_crc_mode(self.crc_mode)
+            await self.set_tx_power(self.tx_power)
+            await self.set_lora_sync_word(self.sync_word)
+            await self.set_lora_preamble_length(self.preamble_length)
+            await self.set_lora_auto_gain_control(self.auto_gain_control)
+            # if not self.auto_gain_control:
+            await self.set_low_noize_amplifier(self.low_noize_amplifier, self.lna_boost)
+            await self.set_lora_rx_tx_fifo_base_addr(0, 0)
+            await self.set_frequency(self.frequency)
+            await self.set_low_data_rate_optimize(self.low_data_rate_optimize)
+            if not self.only_tx:
+                await self.to_receive_mode()
+            return True
 
     async def to_model(self) -> RadioModel:
         if self.interface.connection_status:
@@ -111,20 +112,29 @@ class RadioController(SX127x_Driver):
         op_mode = await self.get_operation_mode()
         cr = await self.get_lora_coding_rate()
         header_mode = await self.get_lora_header_mode()
+        crc = await self.get_lora_crc_mode()
+        sf = await self.get_lora_sf()
+        freq = await self.get_freq()
+        sync_word = await self.get_lora_sync_word()
+        tx_power = await self.get_tx_power_dbm()
+        agc = await self.get_lora_auto_gain_control()
+        ldro = await self.get_low_data_rate_optimize()
+        lna_boost = await self.get_lna_boost()
+        lna_gain = await self.get_lna_gain()
         model = RadioModel(mode=modulation.name if modulation else '',
-                          op_mode=op_mode.name if op_mode else '',
-                          frequency=await self.get_freq(),
-                          spreading_factor=await self.get_lora_sf(),
-                          bandwidth=bw.name if bw else '',
-                          check_crc=await self.get_lora_crc_mode(),
-                          sync_word=await self.get_lora_sync_word(),
-                          coding_rate=cr.name if cr else '',
-                          tx_power=await self.get_tx_power_dbm(),
-                          autogain_control=await self.get_lora_auto_gain_control(),
-                          lna_boost=await self.get_lna_boost(),
-                          lna_gain=await self.get_lna_gain(),
-                          header_mode=header_mode.name if header_mode else '',
-                          ldro=await self.get_low_data_rate_optimize())
+                           op_mode=op_mode.name if op_mode else '',
+                           frequency=freq,
+                           spreading_factor=sf,
+                           bandwidth=bw.name if bw else '',
+                           check_crc=crc,
+                           sync_word=sync_word,
+                           coding_rate=cr.name if cr else '',
+                           tx_power=tx_power,
+                           autogain_control=agc,
+                           lna_boost=lna_boost,
+                           lna_gain=lna_gain,
+                           header_mode=header_mode.name if header_mode else '',
+                           ldro=ldro)
         return model
 
 
@@ -132,7 +142,7 @@ class RadioController(SX127x_Driver):
         if await super().connect(port_or_ip):
             await asyncio.sleep(0.1)
             logger.success(f'Radio {self.label} connected.\nStart initialization...')
-            await self.init()
+            await self.init(asyncio.Condition())
             logger.success(f'Radio {self.label} inited.')
             return True
         logger.warning(f'Radio {self.label} is not connected!')
