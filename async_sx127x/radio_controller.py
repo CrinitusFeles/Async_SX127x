@@ -1,5 +1,6 @@
 from __future__ import annotations
 import asyncio
+from asyncio import Condition, Lock
 from datetime import datetime, UTC
 from ast import literal_eval
 from loguru import logger
@@ -19,6 +20,8 @@ async def sleep(timeout: float):
 
 async def ainput(prompt: str = "") -> str:
     return await asyncio.to_thread(input, prompt)
+
+lock = Lock()
 
 class RadioController(SX127x_Driver):
     def __init__(self, **kwargs) -> None:
@@ -60,8 +63,8 @@ class RadioController(SX127x_Driver):
         self.tx_timeout.subscribers.clear()
         self._last_caller: str = ''
 
-    async def init(self, condition: asyncio.Condition) -> bool:
-        async with condition:
+    async def init(self) -> bool:
+        async with lock:
             await self.interface.reset()
             await asyncio.sleep(0.1)
             await self.set_modulation(self.modulation)
@@ -142,7 +145,7 @@ class RadioController(SX127x_Driver):
         if await super().connect(port_or_ip):
             await asyncio.sleep(0.1)
             logger.success(f'Radio {self.label} connected.\nStart initialization...')
-            await self.init(asyncio.Condition())
+            await self.init()
             logger.success(f'Radio {self.label} inited.')
             return True
         logger.warning(f'Radio {self.label} is not connected!')
@@ -281,35 +284,36 @@ class RadioController(SX127x_Driver):
 
 
     async def check_rx_input(self) -> LoRaRxPacket | None:
-        if not await self.get_rx_done_flag():
-            return None
+        async with lock:
+            if not await self.get_rx_done_flag():
+                return None
 
-        curr_addr: int = await self.interface.read(self.reg.LORA_FIFO_RX_CURRENT_ADDR.value)
-        # TODO: remember previous address to minimize tcp packet (do not need to set fifo address ptr every time)
-        await self.interface.write(self.reg.LORA_FIFO_ADDR_PTR.value, [curr_addr])
-        freq_error: int = self.calculate_freq_error()
-        if self.header_mode == SX127x_HeaderMode.IMPLICIT:
-            data: list[int] = await self.interface.read_several(self.reg.FIFO.value,
-                                                          self.payload_length)
-        else:
-            rx_amount: int = await self.interface.read(self.reg.LORA_RX_NB_BYTES.value)
-            data = await self.interface.read_several(self.reg.FIFO.value, rx_amount)
-        crc: bool = await self.get_crc_flag()
-        await self.reset_irq_flags()
-        bw: float = await self.get_lora_bw_khz()
-        fei: int = await self.get_lora_fei(bw)
-        timestamp: str = datetime.now().astimezone(UTC).isoformat(' ', 'seconds')
-        snr, rssi = await self.get_snr_and_rssi()
-        return LoRaRxPacket(timestamp=timestamp,
-                            data=' '.join(f'{val:02X}' for val in data),
-                            data_len=len(data),
-                            freq_error_hz=freq_error,
-                            frequency=self.frequency,
-                            snr=snr,
-                            rssi_pkt=rssi,
-                            is_crc_error=crc,
-                            fei=fei,
-                            caller=self._last_caller)
+            curr_addr: int = await self.interface.read(self.reg.LORA_FIFO_RX_CURRENT_ADDR.value)
+            # TODO: remember previous address to minimize tcp packet (do not need to set fifo address ptr every time)
+            await self.interface.write(self.reg.LORA_FIFO_ADDR_PTR.value, [curr_addr])
+            freq_error: int = self.calculate_freq_error()
+            if self.header_mode == SX127x_HeaderMode.IMPLICIT:
+                data: list[int] = await self.interface.read_several(self.reg.FIFO.value,
+                                                            self.payload_length)
+            else:
+                rx_amount: int = await self.interface.read(self.reg.LORA_RX_NB_BYTES.value)
+                data = await self.interface.read_several(self.reg.FIFO.value, rx_amount)
+            crc: bool = await self.get_crc_flag()
+            await self.reset_irq_flags()
+            bw: float = await self.get_lora_bw_khz()
+            fei: int = await self.get_lora_fei(bw)
+            timestamp: str = datetime.now().astimezone(UTC).isoformat(' ', 'seconds')
+            snr, rssi = await self.get_snr_and_rssi()
+            return LoRaRxPacket(timestamp=timestamp,
+                                data=' '.join(f'{val:02X}' for val in data),
+                                data_len=len(data),
+                                freq_error_hz=freq_error,
+                                frequency=self.frequency,
+                                snr=snr,
+                                rssi_pkt=rssi,
+                                is_crc_error=crc,
+                                fei=fei,
+                                caller=self._last_caller)
 
     # def dump_memory(self) -> SX127x_Registers:
     #     dump_mem: list[int] = self.get_all_registers()
