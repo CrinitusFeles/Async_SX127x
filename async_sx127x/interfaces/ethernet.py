@@ -1,17 +1,17 @@
 from __future__ import annotations
-import socket
 from loguru import logger
 
 from async_sx127x.interfaces.base_interface import BaseInterface
+import asyncio
 
 
 class EthernetInterface(BaseInterface):
-    def connect(self, ip: str) -> bool:
+    async def connect(self, ip: str) -> bool:
         if self.connection_status:
             return True
         try:
-            self._interface: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self._read = self._interface.recv
+            self.reader, self.writer = await asyncio.open_connection(ip, 80)
+            self._read = self.reader.read
             self._write = self._interface.send
             self._interface.settimeout(2)
             try:
@@ -25,9 +25,14 @@ class EthernetInterface(BaseInterface):
             logger.error('Radio connectoin timeout!')
             return False
 
-    def disconnect(self) -> bool:
+    async def _write(self, data):
+        self.writer.write(data)
+        await self.writer.drain()
+
+    async def disconnect(self) -> bool:
         if self.connection_status:
-            self._interface.close()
+            self.writer.close()
+            await self.writer.wait_closed()
             self.connection_status = False
             return True
         return False

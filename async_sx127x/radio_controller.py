@@ -1,6 +1,6 @@
 from __future__ import annotations
 import asyncio
-from asyncio import Condition, Lock
+from asyncio import Lock
 from datetime import datetime, UTC
 from ast import literal_eval
 from loguru import logger
@@ -48,6 +48,9 @@ class RadioController(SX127x_Driver):
         self.received_raw: Event = Event(bytes)
         self.tx_timeout: Event = Event(str)
         self.on_rx_timeout: Event = Event(str)
+
+        self._tx_buffer: list[LoRaTxPacket] = []
+        self._rx_buffer: list[LoRaRxPacket] = []
 
         self._last_caller: str = ''
         self._repeating_flag: bool = True
@@ -162,6 +165,7 @@ class RadioController(SX127x_Driver):
         is_implicit: bool = (self.header_mode == SX127x_HeaderMode.IMPLICIT)
         for chunk in chunks:
             tx_chunk: LoRaTxPacket = self.calculate_packet(chunk)
+            self._tx_buffer.append(tx_chunk)
             logger.debug(tx_chunk)
             await self.write_fifo(chunk, is_implicit)
             await self.interface.run_tx_then_rx_cont()
@@ -177,6 +181,7 @@ class RadioController(SX127x_Driver):
         if len(data) > buffer_size:
             await self._send_chunks(data, buffer_size)
         else:
+            self._tx_buffer.append(tx_pkt)
             is_implicit: bool = (self.header_mode == SX127x_HeaderMode.IMPLICIT)
             await self.write_fifo(data, is_implicit)
             # print(await self.interface.read(0x0D))
@@ -323,12 +328,24 @@ class RadioController(SX127x_Driver):
     def clear(self) -> None:
         self.sat_path = None
         self.clear_subscribers()
+        self.clear_buffers()
+
+    def clear_buffers(self) -> None:
+        self._rx_buffer.clear()
+        self._tx_buffer.clear()
+
+    def get_tx_buffer(self) -> list[LoRaTxPacket]:
+        return self._tx_buffer
+
+    def get_rx_buffer(self) -> list[LoRaRxPacket]:
+        return self._rx_buffer
 
     async def rx_routine(self) -> None:
         self._keep_running = True
         while self._keep_running:
             pkt: LoRaRxPacket | None = await self.check_rx_input()
             if pkt is not None:
+                self._rx_buffer.append(pkt)
                 logger.debug(pkt)
                 self.received.emit(pkt)
                 self.received_raw.emit(pkt.to_bytes())
