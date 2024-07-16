@@ -12,18 +12,13 @@ class EthernetInterface(BaseInterface):
         try:
             self.reader, self.writer = await asyncio.open_connection(ip, 80)
             self._read = self.reader.read
-            self._write = self._interface.send
-            self._interface.settimeout(2)
-            try:
-                self._interface.connect((ip, 80))
-            except ConnectionRefusedError:
-                logger.error('Radio connected in another thread! Connection refused')
-                return False
+            self._write = self._write
             self.connection_status = True
             return True
-        except TimeoutError:
-            logger.error('Radio connectoin timeout!')
+        except ConnectionRefusedError:
+            logger.error('Radio connected in another thread! Connection refused')
             return False
+
 
     async def _write(self, data):
         self.writer.write(data)
