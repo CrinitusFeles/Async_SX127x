@@ -3,6 +3,7 @@ import asyncio
 from asyncio import Lock
 from datetime import datetime, UTC
 from ast import literal_eval
+from typing import Callable, Iterable
 from loguru import logger
 from event import Event
 from async_sx127x.driver import SX127x_Driver
@@ -253,39 +254,53 @@ class RadioController(SX127x_Driver):
         logger.warning(f'{self.label} get_snr_and_rssi ERROR!')
         return 0, 0
 
-    # async def send_repeat(self, data: bytes | Callable,
-    #                       period_sec: float,
-    #                       untill_answer: bool = True,
-    #                       max_retries: int = 50,
-    #                       answer_handler: Callable[[LoRaRxPacket, Iterable], bool] | None = None,
-    #                       handler_args: Iterable = (),
-    #                       caller_name: str = '') -> LoRaRxPacket | None:
-    #     last_rx_packet: LoRaRxPacket | None = None
-    #     if self.only_tx:
-    #         while max_retries:
-    #             bdata: bytes = data() if isinstance(data, Callable) else data
-    #             tx_packet: LoRaTxPacket = await self.send_single(bdata, caller_name)
-    #             timeout: float = period_sec - tx_packet.Tpkt / 1000
-    #             sleep(timeout)
-    #             max_retries -= 1
-    #         return None
+    async def send_repeat(self, data: bytes | Callable,
+                          period_sec: float,
+                          untill_answer: bool = True,
+                          max_retries: int = 50,
+                          answer_handler: Callable[[LoRaRxPacket, Iterable], bool] | None = None,
+                          handler_args: Iterable = (),
+                          caller_name: str = '') -> LoRaRxPacket | None:
+        last_rx_packet: LoRaRxPacket | None = None
+        if self.only_tx:
+            while max_retries:
+                bdata: bytes = data() if isinstance(data, Callable) else data
+                tx_packet: LoRaTxPacket = await self.send_single(bdata, caller_name)
+                timeout: float = period_sec - tx_packet.Tpkt / 1000
+                await asyncio.sleep(timeout)
+                max_retries -= 1
+            return None
 
-    #     while max_retries and self._repeating_flag:
-    #         bdata: bytes = data() if isinstance(data, Callable) else data
-    #         tx_packet: LoRaTxPacket = await self.send_single(bdata, caller_name)
-    #         timeout: float = period_sec - tx_packet.Tpkt / 1000
+        while max_retries and self._repeating_flag:
+            bdata: bytes = data() if isinstance(data, Callable) else data
+            tx_packet: LoRaTxPacket = await self.send_single(bdata, caller_name)
+            timeout: float = period_sec - tx_packet.Tpkt / 1000
+            try:
+                rx_packet: LoRaRxPacket = await asyncio.wait_for(self._wait_rx(), timeout)
+                last_rx_packet = rx_packet
+                if not rx_packet.is_crc_error and untill_answer:
+                    if answer_handler:
+                        if answer_handler(rx_packet, *handler_args):
+                            break
+                    else:
+                        break
+            except asyncio.TimeoutError:
+                logger.debug('Rx timeout')
+            max_retries -= 1
+        self._repeating_flag = True
+        return last_rx_packet
 
-    #         rx_packet: LoRaRxPacket = self._rx_queue.get(timeout=timeout)
-    #         last_rx_packet = rx_packet
-    #         if not rx_packet.is_crc_error and untill_answer:
-    #             if answer_handler:
-    #                 if answer_handler(rx_packet, *handler_args):
-    #                     break
-    #             else:
-    #                 break
-    #         max_retries -= 1
-    #     self._repeating_flag = True
-    #     return last_rx_packet
+    async def _wait_rx(self) -> LoRaRxPacket:
+        while True:
+            if rx := await self.check_rx_input():
+                return rx
+
+    async def wait_rx(self, timeout: float) -> LoRaRxPacket | None:
+        try:
+            data: LoRaRxPacket = await asyncio.wait_for(self._wait_rx(), timeout)
+            return data
+        except asyncio.TimeoutError:
+            logger.debug('Rx timeout')
 
 
     async def check_rx_input(self) -> LoRaRxPacket | None:
