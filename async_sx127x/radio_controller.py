@@ -47,8 +47,7 @@ class RadioController(SX127x_Driver):
         self.transmited: Event = Event(LoRaTxPacket)
         self.received: Event = Event(LoRaRxPacket)
         self.received_raw: Event = Event(bytes)
-        self.tx_timeout: Event = Event(str)
-        self.on_rx_timeout: Event = Event(str)
+        self.rx_timeout: Event = Event(str)
 
         self._tx_buffer: list[LoRaTxPacket] = []
         self._rx_buffer: list[LoRaRxPacket] = []
@@ -63,8 +62,7 @@ class RadioController(SX127x_Driver):
     def clear_subscribers(self) -> None:
         self.received.subscribers[:] = self.received.subscribers[:2]
         self.transmited.subscribers[:] = self.transmited.subscribers[:2]
-        self.on_rx_timeout.subscribers.clear()
-        self.tx_timeout.subscribers.clear()
+        self.rx_timeout.subscribers.clear()
         self._last_caller: str = ''
 
     async def init(self) -> bool:
@@ -191,7 +189,7 @@ class RadioController(SX127x_Driver):
             await asyncio.sleep((tx_pkt.Tpkt) / 1000)
             await self.reset_irq_flags()
 
-        self.transmited.emit(tx_pkt)
+        await self.transmited.aemit(tx_pkt)
         return tx_pkt
 
     async def to_receive_mode(self) -> None:
@@ -362,8 +360,8 @@ class RadioController(SX127x_Driver):
             if pkt is not None:
                 self._rx_buffer.append(pkt)
                 logger.debug(pkt)
-                self.received.emit(pkt)
-                self.received_raw.emit(pkt.to_bytes())
+                await self.received.aemit(pkt)
+                await self.received_raw.aemit(pkt.to_bytes())
             await asyncio.sleep(0.01)
 
     async def set_frequency(self, new_freq_hz: int) -> None:
