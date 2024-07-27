@@ -33,11 +33,12 @@ class SerialInterface(BaseInterface):
             return not self._interface.is_open
         return True
 
-    async def _try_read(self, amount: int = 1) -> bytes:  # type: ignore
+    async def _try_read(self, amount: int = 1) -> bytes:
         try:
             return await super()._try_read(amount)
         except serialutil.SerialException as exc:
             logger.error(exc)
+            return b''
 
 if __name__ == '__main__':
     ser: SerialInterface = SerialInterface()

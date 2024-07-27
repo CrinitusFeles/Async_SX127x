@@ -2,52 +2,38 @@ from __future__ import annotations
 import math
 from typing import Literal
 from loguru import logger
+from async_sx127x.fsk_sequencer import Sequencer
 from async_sx127x.interfaces.base_interface import BaseInterface
 from async_sx127x.interfaces.ethernet import EthernetInterface
 from async_sx127x.interfaces.serial import SerialInterface
-from async_sx127x.registers_and_params import (SX127x_FSK_ISR,
-                                               SX127x_HeaderMode,
-                                               SX127x_PA_Pin, SX127x_Registers,
-                                               SX127x_Mode, SX127x_LoRa_ISR,
-                                               SX127x_CR, SX127x_Modulation,
-                                               SX127x_ReastartRxMode,
-                                               SX127x_BW,
-                                               SX127x_DcFree, Sequencer)
+from async_sx127x.registers import (SX127x_Modulation, SX127x_RestartRxMode,
+                                    SX127x_FSK_ISR, SX127x_FSK_SHAPING,
+                                    SX127x_HeaderMode, SX127x_PA_Pin,
+                                    SX127x_Registers, SX127x_Mode, SX127x_BW,
+                                    SX127x_LoRa_ISR, SX127x_CR, SX127x_DcFree)
 
 
-# async def exception_handler(func: Callable):
-#     async def _wrapper(*args, **kwargs):
-#         try:
-#             return await func(*args, **kwargs)
-#         except ValueError as err:
-#             logger.error(err)
-#             return None
-#     return _wrapper
-
-def twos_comp(val, bits):
+def twos_comp(val, bits: int):
     """compute the 2's complement of int value val"""
     if (val & (1 << (bits - 1))) != 0: # if sign bit is set e.g., 8bit: 128-255
         val = val - (1 << bits)        # compute negative value
     return val                         # return positive value as is
 
 class SX127x_Driver:
-    reg = SX127x_Registers
-    mode = SX127x_Mode
-    isr = SX127x_LoRa_ISR
-    bw = SX127x_BW
-    cr = SX127x_CR
+    interface: BaseInterface
 
     FXOSC = 32_000_000
     F_STEP: float = FXOSC / 524288
 
     _bw_khz: dict = {key.value: value
-                     for key, value in zip(bw, [7.8, 10.4, 15.6, 20.8, 31.25,
-                                                41.7, 62.5, 125, 250, 500])}
+                     for key, value in zip(SX127x_BW, [7.8, 10.4, 15.6, 20.8,
+                                                       31.25, 41.7, 62.5, 125,
+                                                       250, 500])}
 
     def __init__(self, interface: Literal['Ethernet', 'Serial'] = 'Ethernet',
                  **kwargs) -> None:
         if interface == 'Ethernet':
-            self.interface: BaseInterface = EthernetInterface()
+            self.interface = EthernetInterface()
         else:
            self.interface = SerialInterface()
         self.fsk_sequencer = Sequencer(self.interface)
@@ -166,7 +152,7 @@ class SX127x_Driver:
         return bool(result & 0x04)
 
     async def __disable_ocp(self) -> None:
-        await self.interface.write(SX127x_Registers.OCP.value, [0x1f])
+        await self.interface.write(SX127x_Registers.OCP.value, [0x2B])
 
     async def select_power_amp_pin(self, pin: SX127x_PA_Pin) -> None:
         addr = SX127x_Registers.PA_CONFIG.value
@@ -271,7 +257,8 @@ class SX127x_Driver:
         answer: int = await self.interface.read(addr)
         return bool(answer & 0x04)
 
-    async def set_low_noize_amplifier(self, lna_gain: int, lna_boost: bool) -> None:
+    async def set_low_noize_amplifier(self, lna_gain: int,
+                                      lna_boost: bool) -> None:
         """lna_gain = 1 - min gain; 6 - max gain"""
         await self.interface.write(SX127x_Registers.LNA.value,
                                    [(lna_gain << 5) + 3 * lna_boost])
@@ -314,6 +301,10 @@ class SX127x_Driver:
         await self.interface.write(SX127x_Registers.FIFO.value,
                                    [len(data), *list(data)])
 
+    async def read_fsk_fifo(self, data_len: int):
+        addr: int = SX127x_Registers.FIFO.value
+        return await self.interface.read_several(addr, data_len)
+
     async def set_lora_irq_flags_mask(self, mask: int) -> None:
         """
         0 bit - active interrupt
@@ -332,7 +323,8 @@ class SX127x_Driver:
     async def get_lora_fei(self, bw_khz: float) -> int:
         addr = SX127x_Registers.LORA_FEI_MSB.value
         data = bytes(await self.interface.read_several(addr, 3))
-        f_err: int = int(twos_comp(int.from_bytes(data, 'big'), 20) * (1 << 24) / self.FXOSC * bw_khz / 500)
+        raw_val: int = twos_comp(int.from_bytes(data, 'big'), 20)
+        f_err: int = int(raw_val * (1 << 24) / self.FXOSC * bw_khz / 500)
         return f_err
 
     async def get_lora_isr_list(self) -> list[str]:
@@ -343,6 +335,14 @@ class SX127x_Driver:
         addr = SX127x_Registers.LORA_IRQ_FLAGS.value
         answer: int = await self.interface.read(addr)
         return bool(answer & SX127x_LoRa_ISR.RXDONE.value)
+
+    async def get_lora_fifo_ptr(self) -> int:
+        addr = SX127x_Registers.LORA_FIFO_RX_CURRENT_ADDR.value
+        return await self.interface.read(addr)
+
+    async def read_lora_fifo(self, data_len: int) -> bytes:
+        addr: int = SX127x_Registers.FIFO.value
+        return bytes(await self.interface.read_several(addr, data_len))
 
     async def get_tx_done_flag(self) -> bool:
         addr = SX127x_Registers.LORA_IRQ_FLAGS.value
@@ -382,14 +382,36 @@ class SX127x_Driver:
     async def get_all_registers(self) -> list[int]:
         return await self.interface.read_several(0x01, 0x70)
 
+    async def get_lora_rssi_packet(self, freq_hz: int) -> int:
+        addr = SX127x_Registers.LORA_PKT_RSSI_VALUE.value
+        raw_val: int = await self.interface.read(addr)
+        return raw_val - (164 if freq_hz < 0x779E6 else 157)
+
+    async def get_lora_rssi_value(self, freq_hz: int) -> int:
+        addr = SX127x_Registers.LORA_RSSI_VALUE.value
+        raw_val: int = await self.interface.read(addr)
+        return raw_val - (164 if freq_hz < 0x779E6 else 157)
+
+    async def get_lora_snr(self) -> int:
+        addr = SX127x_Registers.LORA_PKT_SNR_VALUE.value
+        return await self.interface.read(addr) // 4
+
+    async def get_snr_and_rssi(self, freq_hz: int) -> tuple[int, int]:
+        addr = SX127x_Registers.LORA_PKT_SNR_VALUE.value
+        data: list[int] = await self.interface.read_several(addr, 2)
+        if len(data) == 2:
+            snr, rssi = data[0], data[1]
+            return snr // 4, rssi - (164 if freq_hz < 0x779E6 else 157)
+        return 0, 0
+
     async def set_fsk_bitrate(self, bitrate: int) -> None:
-        frac: float = await self.get_fsk_bitrate_frac() / 16
+        frac: float = await self._get_fsk_bitrate_frac() / 16
         reg_bitrate = int(self.FXOSC / bitrate - frac)
         addr = SX127x_Registers.FSK_BITRATE_MSB.value
         await self.interface.write(addr, [reg_bitrate >> 8, reg_bitrate & 0xFF])
 
     async def get_fsk_bitrate(self) -> int:
-        frac: float = await self.get_fsk_bitrate_frac() / 16
+        frac: float = await self._get_fsk_bitrate_frac() / 16
         addr = SX127x_Registers.FSK_BITRATE_MSB.value
         data: list[int] = await self.interface.read_several(addr, 2)
         return int(self.FXOSC / ((data[0] << 8) + data[1] + frac))
@@ -397,114 +419,129 @@ class SX127x_Driver:
     async def set_fsk_bitrate_frac(self, frac: int) -> None:
         await self.interface.write(SX127x_Registers.BITRATE_FRAC.value, [frac])
 
-    async def get_fsk_bitrate_frac(self) -> int:
+    async def _get_fsk_bitrate_frac(self) -> int:
         return await self.interface.read(SX127x_Registers.BITRATE_FRAC.value)
 
-    async def set_fsk_preamble_length(self, preamble_length: int) -> None:
-        await self.interface.write(SX127x_Registers.FSK_PREAMBLE_MSB.value,
-                                   [preamble_length >> 8, preamble_length & 0xFF])
+    async def set_fsk_preamble_length(self, preamble: int) -> None:
+        addr = SX127x_Registers.FSK_PREAMBLE_MSB.value
+        await self.interface.write(addr, [preamble >> 8, preamble & 0xFF])
 
     async def get_fsk_preamble_length(self) -> int:
         addr = SX127x_Registers.FSK_PREAMBLE_MSB.value
         data: list[int] = await self.interface.read_several(addr, 2)
         return data[0] << 8 | data[1]
 
-    async def set_fsk_restart_rx_mode(self, mode: SX127x_ReastartRxMode) -> None:
+    async def set_fsk_restart_rx_mode(self, mode: SX127x_RestartRxMode) -> None:
         addr = SX127x_Registers.FSK_SYNC_CONFIG.value
         reg: int = await self.interface.read(addr) & 0x3F
         await self.interface.write(SX127x_Registers.FSK_SYNC_CONFIG.value,
                                    [reg | (mode.value << 6)])
 
-    async def get_fsk_restart_rx_mode(self) -> SX127x_ReastartRxMode:
+    async def get_fsk_restart_rx_mode(self) -> SX127x_RestartRxMode:
         addr = SX127x_Registers.FSK_SYNC_CONFIG.value
         data: int = await self.interface.read(addr)
-        return SX127x_ReastartRxMode((data & 0xC0) >> 6)
-
-    async def set_fsk_sync_size(self, sync_size: int) -> None:
-        reg: int = await self.interface.read(SX127x_Registers.FSK_SYNC_CONFIG.value) & 0xF8
-        await self.interface.write(SX127x_Registers.FSK_SYNC_CONFIG.value,
-                                   [reg | sync_size - 1])
+        return SX127x_RestartRxMode((data & 0xC0) >> 6)
 
     async def get_fsk_sync_size(self) -> int:
-        return await self.interface.read(SX127x_Registers.FSK_SYNC_CONFIG.value) & 0x07
+        addr = SX127x_Registers.FSK_SYNC_CONFIG.value
+        return await self.interface.read(addr) & 0x07
 
     async def set_fsk_sync_value(self, sync_word: bytes) -> None:
+        addr = SX127x_Registers.FSK_SYNC_CONFIG.value
+        reg: int = await self.interface.read(addr) & 0xF8
+        await self.interface.write(addr, [reg | len(sync_word) - 1])
         await self.interface.write(SX127x_Registers.FSK_SYNC_VALUE1.value,
                                    list(sync_word))
 
-    async def get_fsk_sync_value(self) -> bytes:
-        return bytes(await self.interface.read_several(SX127x_Registers.FSK_SYNC_VALUE1.value, 8))
+    async def get_fsk_sync_value(self, sync_len: int = 8) -> bytes:
+        addr = SX127x_Registers.FSK_SYNC_VALUE1.value
+        return bytes(await self.interface.read_several(addr, sync_len))
 
     async def set_fsk_dc_free_mode(self, mode: SX127x_DcFree) -> None:
-        reg: int = await self.interface.read(SX127x_Registers.FSK_PACKET_CONFIG1.value) & 0x9F
-        await self.interface.write(SX127x_Registers.FSK_PACKET_CONFIG1.value,
-                                   [reg | (mode.value << 5)])
+        addr = SX127x_Registers.FSK_PACKET_CONFIG1.value
+        reg: int = await self.interface.read(addr) & 0x9F
+        await self.interface.write(addr, [reg | (mode.value << 5)])
 
-    # @exception_handler
+    async def set_fsk_data_shaping(self, shaping: SX127x_FSK_SHAPING) -> None:
+        addr = SX127x_Registers.PA_RAMP.value
+        reg: int = await self.interface.read(addr) & 0x0F
+        await self.interface.write(addr, [reg | (shaping.value << 5)])
+
     async def get_fsk_dc_free_mode(self) -> SX127x_DcFree:
-        reg: int = await self.interface.read(SX127x_Registers.FSK_PACKET_CONFIG1.value)
+        addr = SX127x_Registers.FSK_PACKET_CONFIG1.value
+        reg: int = await self.interface.read(addr)
         return SX127x_DcFree((reg & 0x60) >> 5)
 
     async def set_fstx_mode(self) -> None:
-        reg: int = await self.interface.read(SX127x_Registers.OP_MODE.value)
-        await self.interface.write(SX127x_Registers.OP_MODE.value,
-                                   [(reg & 0xF8) | SX127x_Mode.FSTX.value])
+        addr = SX127x_Registers.OP_MODE.value
+        reg: int = await self.interface.read(addr)
+        await self.interface.write(addr, [(reg & 0xF8) | SX127x_Mode.FSTX.value])
 
     async def set_fsrx_mode(self) -> None:
-        reg: int = await self.interface.read(SX127x_Registers.OP_MODE.value)
-        await self.interface.write(SX127x_Registers.OP_MODE.value,
-                                   [(reg & 0xF8) | SX127x_Mode.FSRX.value])
+        addr = SX127x_Registers.OP_MODE.value
+        reg: int = await self.interface.read(addr)
+        await self.interface.write(addr, [(reg & 0xF8) | SX127x_Mode.FSRX.value])
 
     async def set_fsk_crc(self, crc_mode: bool) -> None:
-        reg: int = await self.interface.read(SX127x_Registers.FSK_PACKET_CONFIG1.value) & 0xEF
-        await self.interface.write(SX127x_Registers.FSK_PACKET_CONFIG1.value,
-                                   [reg | (crc_mode << 4)])
+        addr = SX127x_Registers.FSK_PACKET_CONFIG1.value
+        reg: int = await self.interface.read(addr) & 0xEF
+        await self.interface.write(addr, [reg | (crc_mode << 4)])
+
+    async def fsk_clear_fifo_on_crc_fail(self, mode: bool):
+        addr = SX127x_Registers.FSK_PACKET_CONFIG1.value
+        reg: int = await self.interface.read(addr) & 0xF7
+        await self.interface.write(addr, [reg | ((not mode) << 3)])
 
     async def get_fsk_crc(self) -> bool:
-        return bool(await self.interface.read(SX127x_Registers.FSK_PACKET_CONFIG1.value) & 0x10)
+        addr = SX127x_Registers.FSK_PACKET_CONFIG1.value
+        return bool(await self.interface.read(addr) & 0x10)
 
     async def set_fsK_packet_format(self, packet_format: bool) -> None:
-        """sets packet length format in fsk mode
-
-        Args:
-            packet_format (bool): True - packet has variable length; False - packet has fixed length
-        """
-        reg: int = await self.interface.read(SX127x_Registers.FSK_PACKET_CONFIG1.value) & 0x7F
-        await self.interface.write(SX127x_Registers.FSK_PACKET_CONFIG1.value,
-                                   [reg | (packet_format << 7)])
+        addr = SX127x_Registers.FSK_PACKET_CONFIG1.value
+        reg: int = await self.interface.read(addr) & 0x7F
+        await self.interface.write(addr, [reg | (packet_format << 7)])
 
     async def get_fsk_packet_format(self) -> bool:
-        return bool(await self.interface.read(SX127x_Registers.FSK_PACKET_CONFIG1.value) & 0x80)
+        addr = SX127x_Registers.FSK_PACKET_CONFIG1.value
+        return bool(await self.interface.read(addr) & 0x80)
 
     async def set_fsk_sync_mode(self, enable: bool) -> None:
         """Enables the Sync word generation and detection\n
         RegSyncConfig(0x27) 0x04 offset
         """
-        reg: int = await self.interface.read(SX127x_Registers.FSK_SYNC_CONFIG.value) & 0xF7
-        await self.interface.write(SX127x_Registers.FSK_SYNC_CONFIG.value,
-                                   [reg | (enable << 4)])
+        addr = SX127x_Registers.FSK_SYNC_CONFIG.value
+        reg: int = await self.interface.read(addr) & 0xF7
+        await self.interface.write(addr, [reg | (enable << 4)])
 
     async def get_fsk_sync_mode(self) -> bool:
-        return bool(await self.interface.read(SX127x_Registers.FSK_SYNC_CONFIG.value) & 0x10)
+        addr = SX127x_Registers.FSK_SYNC_CONFIG.value
+        return bool(await self.interface.read(addr) & 0x10)
 
-    async def set_fsk_fifo_threshold(self, threshold: int) -> None:
-        reg: int = await self.interface.read(SX127x_Registers.FSK_FIFO_THRESH.value) & 0xC0
-        await self.interface.write(SX127x_Registers.FSK_FIFO_THRESH.value,
-                                   [reg | (threshold & 0x3F)])
+    async def set_fsk_fifo_threshold(self, threshold: int,
+                                     immediate_tx: bool = False) -> None:
+        addr = SX127x_Registers.FSK_FIFO_THRESH.value
+        await self.interface.write(addr, [immediate_tx << 7 | threshold])
 
     async def get_fsk_fifo_threshold(self) -> int:
-        return await self.interface.read(SX127x_Registers.FSK_FIFO_THRESH.value) & 0x3F
+        addr = SX127x_Registers.FSK_FIFO_THRESH.value
+        return await self.interface.read(addr) & 0x3F
 
-    async def add_freq_ppm(self, ppm: float) -> None:
+    async def add_freq_ppm(self, ppm: float) -> int:
         freq: int = await self.get_freq()
-        await self.set_frequency(freq - int(freq * ppm / 1_000_000))
+        new_freq: int = freq - int(freq * ppm / 1_000_000)
+        await self.set_frequency(new_freq)
+        return new_freq
 
-    async def add_freq(self, freq_hz: int) -> None:
+    async def add_freq(self, freq_hz: int) -> int:
         freq: int = await self.get_freq()
+        await self.set_standby_mode()
         await self.set_frequency(freq - freq_hz)
+        await self.set_rx_continuous_mode()
+        return freq - freq_hz
 
     async def get_fsk_isr(self) -> int:
-        data: list[int] = await self.interface.read_several(SX127x_Registers.FSK_IRQ_FLAGS1.value, 2)
+        addr = SX127x_Registers.FSK_IRQ_FLAGS1.value
+        data: list[int] = await self.interface.read_several(addr, 2)
         return (data[0] << 8) + data[1]
 
     async def get_fsk_isr_list(self) -> list[str]:
@@ -512,24 +549,63 @@ class SX127x_Driver:
         return [mask.name for mask in list(SX127x_FSK_ISR) if reg & mask.value]
 
     async def get_fsk_payload_length(self) -> int:
-        data: list[int] = await self.interface.read_several(SX127x_Registers.FSK_PACKET_CONFIG2.value, 2)
+        addr = SX127x_Registers.FSK_PACKET_CONFIG2.value
+        data: list[int] = await self.interface.read_several(addr, 2)
         return ((data[0] & 0x07) << 8) + data[1]
 
     async def set_fsk_payload_length(self, payload_length: int) -> None:
-        reg: int = await self.interface.read(SX127x_Registers.FSK_PACKET_CONFIG2.value) & 0xFC
+        addr = SX127x_Registers.FSK_PACKET_CONFIG2.value
+        reg: int = await self.interface.read(addr) & 0xFC
         payload_high: int = payload_length >> 8
         payload_low: int =  payload_length & 0xFF
-        await self.interface.write(SX127x_Registers.FSK_PACKET_CONFIG2.value, [reg | payload_high, payload_low])
+        await self.interface.write(addr, [reg | payload_high, payload_low])
 
     async def set_fsk_deviation(self, deviation_hz: int) -> None:
-        fdev_high = math.ceil(deviation_hz / self.F_STEP) >> 8
-        fdev_low = math.ceil(deviation_hz / self.F_STEP) & 0xFF
-        await self.interface.write(SX127x_Registers.FSK_FDEV_MSB.value, [fdev_high, fdev_low])
+        fdev_high: int = math.ceil(deviation_hz / self.F_STEP) >> 8
+        fdev_low: int = math.ceil(deviation_hz / self.F_STEP) & 0xFF
+        addr = SX127x_Registers.FSK_FDEV_MSB.value
+        await self.interface.write(addr, [fdev_high, fdev_low])
+
+    async def get_fsk_deviation(self) -> int:
+        addr = SX127x_Registers.FSK_FDEV_MSB.value
+        data: list[int] = await self.interface.read_several(addr, 2)
+        return int((data[0] << 8 | data[1]) * self.F_STEP)
 
     async def get_fsk_fei(self) -> int:
-        data = bytes(await self.interface.read_several(SX127x_Registers.FSK_FEI_MSB.value, 2))
-        f_err: int = int(twos_comp(int.from_bytes(data, 'big'), 16) * self.F_STEP)
-        return f_err
+        """ Works incorrectly on sx127x """
+        addr = SX127x_Registers.FSK_FEI_MSB.value
+        data = bytes(await self.interface.read_several(addr, 2))
+        return int(twos_comp(int.from_bytes(data, 'big'), 16) * self.F_STEP)
+
+    async def set_fsk_auto_afc(self, mode: bool):
+        addr = SX127x_Registers.FSK_RX_CONFIG.value
+        reg: int = await self.interface.read(addr) & 0xEF
+        await self.interface.write(addr, [reg | (mode << 4)])
+
+    async def fsk_clear_afc(self) -> None:
+        addr = SX127x_Registers.FSK_AFC_FEI.value
+        reg: int = await self.interface.read(addr)
+        await self.interface.write(addr, [reg | (1 << 1)])
+
+    async def set_fsk_autoclear_afc(self, mode: bool) -> None:
+        addr = SX127x_Registers.FSK_AFC_FEI.value
+        reg: int = await self.interface.read(addr)
+        await self.interface.write(addr, [reg | mode])
+
+    async def set_fsk_afc_bw(self, mantis: int, exp: int) -> None:
+        addr = SX127x_Registers.FSK_AFC_BW.value
+        reg: int = await self.interface.read(addr) & 0xE0
+        await self.interface.write(addr, [reg | mantis << 3 | exp])
+
+    async def get_fsk_afc(self) -> int:
+        addr = SX127x_Registers.FSK_AFC_MSB.value
+        data: bytes = bytes(await self.interface.read_several(addr, 2))
+        return int(twos_comp(int.from_bytes(data, 'big'), 16) * self.F_STEP)
+
+    async def get_fsk_rssi(self) -> int:
+        addr = SX127x_Registers.FSK_RSSI_VALUE.value
+        raw_val: int = await self.interface.read(addr)
+        return -raw_val // 2
 
     async def registers_dump(self) -> None:
         data: list[int] = await self.interface.read_several(1, 0x40)
@@ -538,4 +614,3 @@ class SX127x_Driver:
                 print(f'{SX127x_Registers(i).name} (0x{i:02X}): 0x{val:02X}')
             except ValueError:
                 print(f'(0x{i:02X}): 0x{val:02X}')
-

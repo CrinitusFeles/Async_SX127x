@@ -1,61 +1,104 @@
 from dataclasses import dataclass
-from pydantic import BaseModel
+from pydantic import BaseModel, field_serializer
 
-class RadioModel(BaseModel):
-    mode: str
-    op_mode: str
-    frequency: int
+
+class LoRaModel(BaseModel):
     spreading_factor: int
     coding_rate: str
     bandwidth: str
-    check_crc: bool
     sync_word: int
-    tx_power: float
     autogain_control: bool
     lna_gain: int
     lna_boost: bool
     header_mode: str
     ldro: bool
 
+class FSK_Model(BaseModel):
+    bitrate: int
+    deviation: int
+    sync_word: bytes
+    dc_free: str
+    packet_format: bool
+
+    @field_serializer('sync_word')
+    def serialize_sync_word(self, sync_word: bytes, _info):
+        try:
+            result = sync_word.decode()
+        except UnicodeDecodeError:
+            result = sync_word.hex(' ').upper()
+        return result
+
+class RadioModel(BaseModel):
+    frequency: int
+    check_crc: bool
+    tx_power: float
+    pa_select: bool
+    mode: FSK_Model | LoRaModel
+
     def __str__(self) -> str:
-        return super().__str__().replace(' ', '\n')
+        return self.model_dump_json(indent=4)
 
 @dataclass
-class LoRaPacket:
+class RadioPacket:
     timestamp: str
-    data: str
+    data: bytes
     data_len: int
-    freq_error_hz: int
     frequency: int
 
-    def to_bytes(self) -> bytes:
-        return bytes.fromhex(self.data)
-
 
 @dataclass
-class LoRaRxPacket(LoRaPacket):
+class LoRaRxPacket(RadioPacket):
     snr: int
     rssi_pkt: int
-    is_crc_error: bool
+    crc_correct: bool
     fei: int
+    mode: str = 'LoRa'
     caller: str = ''
 
     def __str__(self) -> str:
-        caller_name: str = f' [{self.caller}] ' if self.caller else ' '
-        currepted_string: str = ' (CORRUPTED) ' if self.is_crc_error else ' '
-        return f"{self.timestamp}{caller_name}{currepted_string}"\
-               f"freq error: {self.freq_error_hz}; FEI: {self.fei}; " \
-               f"rssi: {self.rssi_pkt}; snr: {self.snr}; "\
-               f"data len: {self.data_len};\n rx < {self.data}"
+        caller_name: str = f'[{self.caller}] ' if self.caller else ' '
+        currepted_string: str = '(CORRUPTED) ' if self.crc_correct else ' '
+        return f"{self.timestamp} {caller_name}{self.mode} {currepted_string}"\
+               f"Freq: {self.frequency:_}; "\
+               f"FEI: {self.fei}; " \
+               f"RSSI: {self.rssi_pkt}; snr: {self.snr};\n"\
+               f"RX[{self.data_len}] < {self.data.hex(' ').upper()}"
 
 
 @dataclass
-class LoRaTxPacket(LoRaPacket):
+class LoRaTxPacket(RadioPacket):
     Tpkt: float
     low_datarate_opt_flag: bool
+    mode: str = 'LoRa'
     caller: str = ''
-
     def __str__(self) -> str:
-        caller_name: str = f' [{self.caller}] ' if self.caller else ' '
-        return f"{self.timestamp}{caller_name}data len: {self.data_len}; "\
-               f"TOF(ms): {round(self.Tpkt)}; tx > {self.data}"
+        caller_name: str = f'[{self.caller}] ' if self.caller else ''
+        return f"{self.timestamp} {self.mode} {caller_name} "\
+               f"Freq: {self.frequency:_} "\
+               f"TOF(ms): {round(self.Tpkt)};\n"\
+               f"TX[{self.data_len}] > {self.data.hex(' ').upper()}"
+
+
+@dataclass
+class FSK_RX_Packet(RadioPacket):
+    rssi: int
+    crc_correct: bool
+    mode: str = 'FSK'
+    caller: str = ''
+    def __str__(self) -> str:
+        caller_name: str = f'[{self.caller}] ' if self.caller else ''
+        currepted_string: str = '(CORRUPTED) ' if self.crc_correct else ' '
+        return f"{self.timestamp} {caller_name} {self.mode} {currepted_string}"\
+               f"Freq: {self.frequency:_}; "\
+               f"RSSI: {self.rssi};\n"\
+               f"RX[{self.data_len}] < {self.data.hex(' ').upper()}"
+
+@dataclass
+class FSK_TX_Packet(RadioPacket):
+    mode: str = 'FSK'
+    caller: str = ''
+    def __str__(self) -> str:
+        caller_name: str = f'[{self.caller}] ' if self.caller else ''
+        return f"{self.timestamp} {self.mode} {caller_name} "\
+               f"Freq: {self.frequency:_}\n"\
+               f"TX[{self.data_len}] > {self.data.hex(' ').upper()}"

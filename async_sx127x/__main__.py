@@ -1,17 +1,31 @@
 
 
 import asyncio
+from async_sx127x.models import FSK_RX_Packet, FSK_TX_Packet, LoRaRxPacket, LoRaTxPacket
 from async_sx127x.radio_controller import RadioController
 
+async def on_received(data: LoRaRxPacket | FSK_RX_Packet):
+    print(data)
+
+async def on_transmited(data: LoRaTxPacket | FSK_TX_Packet):
+    print(data)
 
 async def test():
-    lora: RadioController = RadioController(interface='Serial', tx_power=2)
-    if await lora.connect(port_or_ip='COM25'):  # 192.168.0.5
-        print(await lora.read_config())
-        rx_task = lora.rx_routine()
-        cli_task = lora.user_cli()
-        fut = await asyncio.gather(rx_task, cli_task)
-        print(fut)
+    if await device.connect(port_or_ip='COM25'):  # 192.168.0.5
+        print(await device.read_config())
+        asyncio.create_task(device.rx_routine())
+        await device.user_cli()
+
 
 if __name__ == '__main__':
-    asyncio.run(test())
+    device: RadioController = RadioController('lora',
+                                              interface='Serial',
+                                              frequency=437_501_400,
+                                              tx_power=3)
+    device.received.subscribe(on_received)
+    device.transmited.subscribe(on_transmited)
+    try:
+        asyncio.run(test())
+    except KeyboardInterrupt:
+        asyncio.run(device.disconnect())
+        print('Shutdown')
