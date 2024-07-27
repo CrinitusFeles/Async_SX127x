@@ -35,6 +35,9 @@ class RadioController:
         self._tx_buffer: list[LoRaTxPacket | FSK_TX_Packet] = []
         self._rx_buffer: list[LoRaRxPacket | FSK_RX_Packet] = []
 
+    def connection_status(self) -> bool:
+        return self.driver.interface.connection_status
+
     async def connect(self, port_or_ip: str) -> bool:
         if await self.driver.connect(port_or_ip):
             await asyncio.sleep(0.1)
