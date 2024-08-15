@@ -15,6 +15,8 @@ from async_sx127x.registers import (SX127x_BW, SX127x_CR, SX127x_HeaderMode,
 async def ainput(prompt: str = "") -> str:
     return await asyncio.to_thread(input, prompt)
 
+lock = asyncio.Lock()
+
 class LoRa_Controller:
     freq_hz: int
     crc_mode: bool
@@ -50,6 +52,7 @@ class LoRa_Controller:
         self.label: str = kwargs.get('label', '')
         self._transmited: Event = Event(LoRaTxPacket)
         self._last_caller: str = ''
+        self._last_rx: LoRaRxPacket | None = None
 
     async def init(self)  -> None:
         await self.driver.reset()
@@ -204,6 +207,7 @@ class LoRa_Controller:
             tx_packet: LoRaTxPacket = await self.send_single(bdata, caller_name)
             timeout: float = period_sec - tx_packet.Tpkt / 1000
             try:
+                self._last_rx = None
                 rx_packet: LoRaRxPacket = await asyncio.wait_for(self._wait_rx(),
                                                                  timeout)
                 last_rx_packet = rx_packet
@@ -219,9 +223,15 @@ class LoRa_Controller:
         return last_rx_packet
 
     async def _wait_rx(self) -> LoRaRxPacket:
-        while True:
-            if rx := await self.check_rx_input():
-                return rx
+        while not self._last_rx:
+            await asyncio.sleep(0.01)
+        return self._last_rx
+        # async with lock:
+        #     while True:
+        #         rx = await self.check_rx_input()
+        #         await asyncio.sleep(0.01)
+        #         if rx:
+        #             return rx
 
     async def check_rx_input(self) -> LoRaRxPacket | None:
         if not await self.driver.get_rx_done_flag():
@@ -241,7 +251,7 @@ class LoRa_Controller:
         fei: int = await self.driver.get_lora_fei(bw)
         timestamp: str = datetime.now(UTC).isoformat(' ', 'seconds')
         snr, rssi = await self.driver.get_snr_and_rssi(self.freq_hz)
-        return LoRaRxPacket(timestamp=timestamp,
+        self._last_rx = LoRaRxPacket(timestamp=timestamp,
                             data=bytes(data),
                             data_len=len(data),
                             frequency=self.freq_hz,
@@ -250,3 +260,4 @@ class LoRa_Controller:
                             crc_correct=not crc_error,
                             fei=fei,
                             caller=self._last_caller)
+        return self._last_rx
