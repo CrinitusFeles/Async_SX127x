@@ -209,7 +209,7 @@ class LoRa_Controller:
                 last_rx_packet = rx_packet
                 if rx_packet.crc_correct and untill_answer:
                     if handler:
-                        if handler(rx_packet, *handler_args):
+                        if await handler(rx_packet, *handler_args):
                             break
                     else:
                         break
@@ -235,7 +235,7 @@ class LoRa_Controller:
             rx_size_addr = SX127x_Registers.LORA_RX_NB_BYTES.value
             rx_amount: int = await self.driver.interface.read(rx_size_addr)
             data = await self.driver.read_lora_fifo(rx_amount)
-        crc: bool = await self.driver.get_crc_flag()
+        crc_error: bool = await self.driver.get_crc_flag()
         await self.driver.reset_irq_flags()
         bw: float = await self.driver.get_lora_bw_khz()
         fei: int = await self.driver.get_lora_fei(bw)
@@ -247,6 +247,6 @@ class LoRa_Controller:
                             frequency=self.freq_hz,
                             snr=snr,
                             rssi_pkt=rssi,
-                            crc_correct=crc,
+                            crc_correct=not crc_error,
                             fei=fei,
                             caller=self._last_caller)

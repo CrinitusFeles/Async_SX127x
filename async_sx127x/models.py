@@ -57,7 +57,7 @@ class LoRaRxPacket(RadioPacket):
 
     def __str__(self) -> str:
         caller_name: str = f'[{self.caller}] ' if self.caller else ' '
-        currepted_string: str = '(CORRUPTED) ' if self.crc_correct else ' '
+        currepted_string: str = '(CORRUPTED) ' if not self.crc_correct else ' '
         return f"{self.timestamp} {caller_name}{self.mode} {currepted_string}"\
                f"Freq: {self.frequency:_}; "\
                f"FEI: {self.fei}; " \
@@ -87,7 +87,7 @@ class FSK_RX_Packet(RadioPacket):
     caller: str = ''
     def __str__(self) -> str:
         caller_name: str = f'[{self.caller}] ' if self.caller else ''
-        currepted_string: str = '(CORRUPTED) ' if self.crc_correct else ' '
+        currepted_string: str = '(CORRUPTED) ' if not self.crc_correct else ' '
         return f"{self.timestamp} {caller_name} {self.mode} {currepted_string}"\
                f"Freq: {self.frequency:_}; "\
                f"RSSI: {self.rssi};\n"\

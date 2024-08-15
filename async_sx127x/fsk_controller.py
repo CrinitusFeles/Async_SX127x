@@ -172,7 +172,7 @@ class FSK_Controller:
                           period_sec: float,
                           untill_answer: bool = True,
                           max_retries: int = 50,
-                          answer_handler: Callable[[FSK_RX_Packet, Iterable],
+                          handler: Callable[[FSK_RX_Packet, Iterable],
                                                    Awaitable[bool]] | None = None,
                           handler_args: Iterable = (),
                           caller_name: str = '') -> FSK_RX_Packet | None:
@@ -186,8 +186,8 @@ class FSK_Controller:
                                                               period_sec)
                     last_rx_packet = rx_packet
                     if rx_packet.crc_correct and untill_answer:
-                        if answer_handler:
-                            if answer_handler(rx_packet, *handler_args):
+                        if handler:
+                            if await handler(rx_packet, *handler_args):
                                 break
                         else:
                             break

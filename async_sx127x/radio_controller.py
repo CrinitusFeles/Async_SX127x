@@ -1,6 +1,3 @@
-
-
-from ast import literal_eval
 import asyncio
 from random import randint
 from typing import Awaitable, Callable, Iterable, Literal
@@ -162,8 +159,7 @@ class RadioController:
                     print(task)
                 continue
             try:
-                list_data: list = literal_eval(data)
-                bdata = bytes(list_data)
+                bdata: bytes = bytes.fromhex(data)
                 await self.send_single(bdata)
             except (SyntaxError, ValueError):
                 await self.send_single(data.encode())
@@ -183,9 +179,9 @@ async def test():
 
 
 if __name__ == '__main__':
-    device: RadioController = RadioController('fsk',
+    device: RadioController = RadioController('lora',
                                               interface='Serial',
-                                              frequency=437_501_400,
+                                              frequency=401_500_000,
                                               tx_power=3)
     device.received.subscribe(on_received)
     device.transmited.subscribe(on_transmited)
