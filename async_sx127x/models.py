@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from pydantic import BaseModel, field_serializer
 
 
@@ -38,15 +37,13 @@ class RadioModel(BaseModel):
     def __str__(self) -> str:
         return self.model_dump_json(indent=4)
 
-@dataclass
-class RadioPacket:
+class RadioPacket(BaseModel):
     timestamp: str
     data: bytes
     data_len: int
     frequency: int
 
 
-@dataclass
 class LoRaRxPacket(RadioPacket):
     snr: int
     rssi_pkt: int
@@ -65,7 +62,6 @@ class LoRaRxPacket(RadioPacket):
                f"RX[{self.data_len}] < {self.data.hex(' ').upper()}"
 
 
-@dataclass
 class LoRaTxPacket(RadioPacket):
     Tpkt: float
     low_datarate_opt_flag: bool
@@ -79,7 +75,6 @@ class LoRaTxPacket(RadioPacket):
                f"TX[{self.data_len}] > {self.data.hex(' ').upper()}"
 
 
-@dataclass
 class FSK_RX_Packet(RadioPacket):
     rssi: int
     crc_correct: bool
@@ -93,7 +88,6 @@ class FSK_RX_Packet(RadioPacket):
                f"RSSI: {self.rssi};\n"\
                f"RX[{self.data_len}] < {self.data.hex(' ').upper()}"
 
-@dataclass
 class FSK_TX_Packet(RadioPacket):
     mode: str = 'FSK'
     caller: str = ''
