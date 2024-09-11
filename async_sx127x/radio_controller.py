@@ -109,14 +109,17 @@ class RadioController:
 
     async def rx_routine(self) -> None:
         pkt: LoRaRxPacket | FSK_RX_Packet | None = None
-        while True:
-            pkt = await self.current_mode.check_rx_input()
-            if pkt:
-                self._rx_buffer.append(pkt)
-                logger.debug(pkt)
-                self._rx_buffer.append(pkt)
-                asyncio.create_task(self.received.aemit(pkt),
-                                    name='Radio emit notification')
+        try:
+            while True:
+                    pkt = await self.current_mode.check_rx_input()
+                    if pkt:
+                        self._rx_buffer.append(pkt)
+                        logger.debug(pkt)
+                        self._rx_buffer.append(pkt)
+                        asyncio.create_task(self.received.aemit(pkt),
+                                            name='Radio emit notification')
+        except RuntimeError as err:
+            logger.error(err)
 
     async def set_frequency(self, new_freq_hz: int) -> None:
         await self.current_mode.driver.set_frequency(new_freq_hz)
