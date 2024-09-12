@@ -47,7 +47,7 @@ class LoRa_Controller:
         self.lna_val = kwargs.get('low_noize_amplifier', 5)  # 1 - min; 6 - max
         self.lna_boost = kwargs.get('lna_boost', False)  # 150% LNA current
         self.header_mode = kwargs.get('header_mode', SX127x_HeaderMode.EXPLICIT)
-        self.ldro = kwargs.get('low_data_rate_optimize', True)
+        self.ldro = kwargs.get('ldro', True)
         self._only_tx: bool = kwargs.get('only_tx', False)
         self.label: str = kwargs.get('label', '')
         self._transmited: Event = Event(LoRaTxPacket)
