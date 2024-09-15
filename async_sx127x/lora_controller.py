@@ -48,7 +48,6 @@ class LoRa_Controller:
         self.lna_boost = kwargs.get('lna_boost', False)  # 150% LNA current
         self.header_mode = kwargs.get('header_mode', SX127x_HeaderMode.EXPLICIT)
         self.ldro = kwargs.get('ldro', True)
-        self._only_tx: bool = kwargs.get('only_tx', False)
         self.label: str = kwargs.get('label', '')
         self._transmited: Event = Event(LoRaTxPacket)
         self._last_caller: str = ''
@@ -75,19 +74,18 @@ class LoRa_Controller:
         await self.driver.set_lora_rx_tx_fifo_base_addr(0, 0)
         await self.driver.set_frequency(self.freq_hz)
         await self.driver.set_low_data_rate_optimize(self.ldro)
-        if not self._only_tx:
-            await self.driver.set_rx_continuous_mode()
+        await self.driver.set_rx_continuous_mode()
 
     async def to_model(self) -> RadioModel:
         model = LoRaModel(spreading_factor=self.spread_factor,
-                            bandwidth=self.bandwidth.name,
-                            sync_word=self.sync_word,
-                            coding_rate=self.coding_rate.name,
-                            lna_boost=self.lna_boost,
-                            lna_gain=self.lna_val,
-                            header_mode=self.header_mode.name,
-                            autogain_control=self.auto_gain_control,
-                            ldro=self.ldro)
+                          bandwidth=self.bandwidth.name,
+                          sync_word=self.sync_word,
+                          coding_rate=self.coding_rate.name,
+                          lna_boost=self.lna_boost,
+                          lna_gain=self.lna_val,
+                          header_mode=self.header_mode.name,
+                          autogain_control=self.auto_gain_control,
+                          ldro=self.ldro)
         return RadioModel(mode=model,
                           frequency=self.freq_hz,
                           pa_select=self.driver.pa_boost,
@@ -106,21 +104,21 @@ class LoRa_Controller:
         lna_boost: bool = await self.driver.get_lna_boost()
         lna_gain: int = await self.driver.get_lna_gain()
         model = LoRaModel(spreading_factor=sf,
-                            bandwidth=bw,
-                            sync_word=sync_word,
-                            coding_rate=cr,
-                            autogain_control=agc,
-                            lna_boost=lna_boost,
-                            lna_gain=lna_gain,
-                            header_mode=header_mode,
-                            ldro=ldro)
+                          bandwidth=bw,
+                          sync_word=sync_word,
+                          coding_rate=cr,
+                          autogain_control=agc,
+                          lna_boost=lna_boost,
+                          lna_gain=lna_gain,
+                          header_mode=header_mode,
+                          ldro=ldro)
         freq: int = await self.driver.get_freq()
         tx_power: float = await self.driver.get_tx_power_dbm()
         radio_model = RadioModel(mode=model,
-                           frequency=freq,
-                           pa_select=self.driver.pa_boost,
-                           check_crc=crc,
-                           tx_power=tx_power)
+                                 frequency=freq,
+                                 pa_select=self.driver.pa_boost,
+                                 check_crc=crc,
+                                 tx_power=tx_power)
         return radio_model
 
     async def _send_chunks(self, data: bytes, chunk_size: int) -> None:
@@ -192,16 +190,6 @@ class LoRa_Controller:
                           handler_args: Iterable = (),
                           caller_name: str = '') -> LoRaRxPacket | None:
         last_rx_packet: LoRaRxPacket | None = None
-        if self._only_tx:
-            while max_retries:
-                bdata: bytes = data() if isinstance(data, Callable) else data
-                tx_packet: LoRaTxPacket = await self.send_single(bdata,
-                                                                 caller_name)
-                timeout: float = period_sec - tx_packet.Tpkt / 1000
-                await asyncio.sleep(timeout)
-                max_retries -= 1
-            return None
-
         while max_retries:
             bdata: bytes = data() if isinstance(data, Callable) else data
             tx_packet: LoRaTxPacket = await self.send_single(bdata, caller_name)
@@ -224,14 +212,8 @@ class LoRa_Controller:
 
     async def _wait_rx(self) -> LoRaRxPacket:
         while not self._last_rx:
-            await asyncio.sleep(0.01)
+            await asyncio.sleep(0.001)
         return self._last_rx
-        # async with lock:
-        #     while True:
-        #         rx = await self.check_rx_input()
-        #         await asyncio.sleep(0.01)
-        #         if rx:
-        #             return rx
 
     async def check_rx_input(self) -> LoRaRxPacket | None:
         if not await self.driver.get_rx_done_flag():

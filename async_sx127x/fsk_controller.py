@@ -113,10 +113,10 @@ class FSK_Controller:
         freq: int = await self.driver.get_freq()
         tx_power: float = await self.driver.get_tx_power_dbm()
         radio_model = RadioModel(mode=model,
-                           frequency=freq,
-                           pa_select=self.driver.pa_boost,
-                           check_crc=self.check_crc,
-                           tx_power=tx_power)
+                                 frequency=freq,
+                                 pa_select=self.driver.pa_boost,
+                                 check_crc=self.check_crc,
+                                 tx_power=tx_power)
         return radio_model
 
     def _tx_frame(self, data: bytes, caller_name: str) -> FSK_TX_Packet:
