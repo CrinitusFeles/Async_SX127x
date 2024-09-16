@@ -43,6 +43,10 @@ class RadioPacket(BaseModel):
     data_len: int
     frequency: int
 
+    @field_serializer('data')
+    def serialize_data(self, dt: bytes, _info):
+        return dt.hex().upper()
+
 
 class LoRaRxPacket(RadioPacket):
     snr: int
