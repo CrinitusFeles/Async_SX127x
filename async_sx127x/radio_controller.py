@@ -119,7 +119,7 @@ class RadioController:
                         self._rx_buffer.append(pkt)
                         asyncio.create_task(self.received.aemit(pkt),
                                             name='Radio emit notification')
-        except RuntimeError as err:
+        except (RuntimeError, ConnectionResetError) as err:
             logger.error(err)
         except asyncio.CancelledError:
             logger.debug('Radio RX task cancelled')
