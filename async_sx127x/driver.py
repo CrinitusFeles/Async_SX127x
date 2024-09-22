@@ -48,8 +48,8 @@ class SX127x_Driver:
     async def connect(self, port_or_ip: str) -> bool:
         return await self.interface.connect(port_or_ip)
 
-    def disconnect(self) -> bool:
-        return self.interface.disconnect()
+    async def disconnect(self) -> bool:
+        return await self.interface.disconnect()
 
     async def reset(self) -> None:
         await self.interface.reset()

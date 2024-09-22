@@ -38,7 +38,8 @@ class RadioController:
     async def connect(self, port_or_ip: str) -> bool:
         if await self.driver.connect(port_or_ip):
             await asyncio.sleep(0.1)
-            logger.success(f'Radio {self.label} connected.\nStart initialization...')
+            logger.success(f'Radio {self.label} connected.\n'
+                           f'Start initialization...')
             await self.current_mode.init()
             logger.success(f'Radio {self.label} inited.')
             return True
@@ -47,7 +48,7 @@ class RadioController:
 
     async def disconnect(self) -> bool:
         await self.driver.reset()
-        return self.driver.disconnect()
+        return await self.driver.disconnect()
 
     async def _on_transmited(self, pkt: LoRaTxPacket | FSK_TX_Packet):
         self._tx_buffer.append(pkt)

@@ -26,7 +26,7 @@ class SerialInterface(BaseInterface):
             logger.error(err)
             return False
 
-    def disconnect(self) -> bool:
+    async def disconnect(self) -> bool:
         if self.connection_status:
             self._interface.close()
             self.connection_status = False

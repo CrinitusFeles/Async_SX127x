@@ -12,7 +12,7 @@ class EthernetInterface(BaseInterface):
         try:
             self.reader, self.writer = await asyncio.open_connection(ip, 80)
             self._read = self.reader.read
-            self._write = self._write
+            self._write = self._tcp_write
             self.connection_status = True
             return True
         except ConnectionRefusedError:
@@ -20,7 +20,7 @@ class EthernetInterface(BaseInterface):
             return False
 
 
-    async def _write(self, data):
+    async def _tcp_write(self, data):
         self.writer.write(data)
         await self.writer.drain()
 

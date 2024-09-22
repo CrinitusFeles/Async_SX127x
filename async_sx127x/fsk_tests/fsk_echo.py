@@ -125,4 +125,4 @@ if __name__ == '__main__':
         asyncio.run(main())
     except KeyboardInterrupt:
         asyncio.run(lora.interface.reset())
-        lora.disconnect()
+        asyncio.run(lora.disconnect())
