@@ -121,6 +121,8 @@ class RadioController:
                                             name='Radio emit notification')
         except RuntimeError as err:
             logger.error(err)
+        except asyncio.CancelledError:
+            logger.debug('Radio RX task cancelled')
 
     async def set_frequency(self, new_freq_hz: int) -> None:
         await self.current_mode.driver.set_frequency(new_freq_hz)
