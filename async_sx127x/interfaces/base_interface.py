@@ -31,7 +31,7 @@ class BaseInterface:
     _interface: Any
     connection_status: bool = False
 
-    async def connect(self, _: str):
+    async def connect(self, ip_or_port: str) -> bool:
         raise NotImplementedError
 
     def disconnect(self):

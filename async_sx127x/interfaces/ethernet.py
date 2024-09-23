@@ -1,4 +1,3 @@
-from __future__ import annotations
 from loguru import logger
 
 from async_sx127x.interfaces.base_interface import BaseInterface
@@ -6,11 +5,11 @@ import asyncio
 
 
 class EthernetInterface(BaseInterface):
-    async def connect(self, ip: str) -> bool:
+    async def connect(self, ip_or_port: str) -> bool:
         if self.connection_status:
             return True
         try:
-            self.reader, self.writer = await asyncio.open_connection(ip, 80)
+            self.reader, self.writer = await asyncio.open_connection(ip_or_port, 80)
             self._read = self.reader.read
             self._write = self._tcp_write
             self.connection_status = True
