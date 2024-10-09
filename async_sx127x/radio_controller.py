@@ -8,6 +8,7 @@ from async_sx127x.fsk_controller import FSK_Controller
 from async_sx127x.lora_controller import LoRa_Controller
 from async_sx127x.models import (FSK_RX_Packet, FSK_TX_Packet, LoRaRxPacket,
                                  LoRaTxPacket, RadioModel)
+from async_sx127x.registers import SX127x_BW, SX127x_CR
 
 
 async def ainput(prompt: str = "") -> str:
@@ -85,7 +86,31 @@ class RadioController:
     async def to_model(self) -> RadioModel:
         return await self.current_mode.to_model()
 
-    async def init_lora(self) -> None:
+    async def init_lora(self, sf: int | None = None,
+                        bw: SX127x_BW | None = None,
+                        freq: int | None = None,
+                        cr: SX127x_CR | None = None,
+                        ldro: bool | None = None,
+                        crc_en: bool | None = None,
+                        sync_word: int | None = None,
+                        preamble_length: int | None = None
+                        ) -> None:
+        if sf is not None:
+            self.lora.spread_factor = sf
+        if bw is not None:
+            self.lora.bandwidth = bw
+        if freq is not None:
+            self.lora.freq_hz = freq
+        if cr is not None:
+            self.lora.coding_rate = cr
+        if ldro is not None:
+            self.lora.ldro = ldro
+        if crc_en is not None:
+            self.lora.crc_mode = crc_en
+        if sync_word is not None:
+            self.lora.sync_word = sync_word
+        if preamble_length is not None:
+            self.lora.preamble_length = preamble_length
         await self.lora.init()
         self.current_mode = self.lora
 
