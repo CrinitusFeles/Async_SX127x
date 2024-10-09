@@ -1,6 +1,6 @@
 import asyncio
 from random import randint
-from typing import Awaitable, Callable, Coroutine, Iterable, Literal
+from typing import Callable, Coroutine, Iterable, Literal
 
 from loguru import logger
 from async_sx127x.driver import SX127x_Driver
@@ -17,7 +17,7 @@ async def ainput(prompt: str = "") -> str:
 RX_CALLBACK = Callable[[LoRaRxPacket | FSK_RX_Packet], Coroutine | None]
 TX_CALLBACK = Callable[[LoRaTxPacket | FSK_TX_Packet], Coroutine | None]
 ANSWER_CALLBACK = Callable[[LoRaRxPacket | FSK_RX_Packet, Iterable],
-                           Awaitable[bool] | bool]
+                           Coroutine | bool]
 
 class RadioController:
     def __init__(self, mode: Literal['lora', 'fsk'] = 'lora', **kwargs) -> None:

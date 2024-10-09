@@ -2,7 +2,7 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, UTC
 from ast import literal_eval
-from typing import Awaitable, Callable, Coroutine, Iterable
+from typing import Callable, Coroutine, Iterable
 from loguru import logger
 from async_sx127x.driver import SX127x_Driver
 from async_sx127x.models import (LoRaModel, LoRaRxPacket, LoRaTxPacket,
@@ -17,7 +17,7 @@ async def ainput(prompt: str = "") -> str:
 
 lock = asyncio.Lock()
 CALLBACK = Callable[[LoRaTxPacket], Coroutine | None]
-ANSWER_CALLBACK = Callable[[LoRaRxPacket, Iterable], Awaitable[bool] | bool]
+ANSWER_CALLBACK = Callable[[LoRaRxPacket, Iterable], Coroutine | bool]
 
 class LoRa_Controller:
     freq_hz: int
