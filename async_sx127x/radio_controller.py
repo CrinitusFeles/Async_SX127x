@@ -1,13 +1,13 @@
 import asyncio
 from random import randint
-from typing import Callable, Coroutine, Iterable, Literal
+from typing import Awaitable, Callable, Coroutine, Iterable, Literal
 
 from loguru import logger
 from async_sx127x.driver import SX127x_Driver
 from async_sx127x.fsk_controller import FSK_Controller
 from async_sx127x.lora_controller import LoRa_Controller
 from async_sx127x.models import (FSK_RX_Packet, FSK_TX_Packet, LoRaRxPacket,
-                                 LoRaTxPacket, RadioModel, RadioPacket)
+                                 LoRaTxPacket, RadioModel)
 
 
 async def ainput(prompt: str = "") -> str:
@@ -17,7 +17,7 @@ async def ainput(prompt: str = "") -> str:
 RX_CALLBACK = Callable[[LoRaRxPacket | FSK_RX_Packet], Coroutine | None]
 TX_CALLBACK = Callable[[LoRaTxPacket | FSK_TX_Packet], Coroutine | None]
 ANSWER_CALLBACK = Callable[[LoRaRxPacket | FSK_RX_Packet, Iterable],
-                           Coroutine | bool]
+                           Awaitable[bool] | bool]
 
 class RadioController:
     def __init__(self, mode: Literal['lora', 'fsk'] = 'lora', **kwargs) -> None:
@@ -99,7 +99,7 @@ class RadioController:
                           max_retries: int = 50,
                           answer_handler: ANSWER_CALLBACK | None = None,
                           handler_args: Iterable = (),
-                          caller_name: str = '') -> RadioPacket | None:
+                          caller_name: str = '') -> LoRaRxPacket | FSK_RX_Packet | None:
         return await self.current_mode.send_repeat(data, period_sec,
                                                    untill_answer,
                                                    max_retries, answer_handler,

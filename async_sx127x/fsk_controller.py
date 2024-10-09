@@ -3,7 +3,7 @@
 import asyncio
 from asyncio import Lock, create_task, iscoroutinefunction, wait_for
 from datetime import datetime
-from typing import Callable, Coroutine, Iterable
+from typing import Awaitable, Callable, Coroutine, Iterable
 from loguru import logger
 from async_sx127x.driver import SX127x_Driver
 from async_sx127x.models import (FSK_Model, FSK_RX_Packet, FSK_TX_Packet,
@@ -15,7 +15,7 @@ from async_sx127x.registers import (SX127x_FSK_SHAPING, SX127x_RestartRxMode,
 
 lock = Lock()
 CALLBACK = Callable[[FSK_TX_Packet], Coroutine | None]
-ANSWER_CALLBACK = Callable[[FSK_RX_Packet, Iterable], Coroutine | bool]
+ANSWER_CALLBACK = Callable[[FSK_RX_Packet, Iterable], Awaitable[bool] | bool]
 
 
 class FSK_Controller:
