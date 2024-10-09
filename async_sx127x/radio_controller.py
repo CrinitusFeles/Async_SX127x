@@ -14,7 +14,8 @@ async def ainput(prompt: str = "") -> str:
     return await asyncio.to_thread(input, prompt)
 
 
-CALLBACK = Callable[..., Coroutine | RadioPacket]
+RX_CALLBACK = Callable[[LoRaRxPacket | FSK_RX_Packet], Coroutine | None]
+TX_CALLBACK = Callable[[LoRaTxPacket | FSK_TX_Packet], Coroutine | None]
 
 
 class RadioController:
@@ -29,8 +30,8 @@ class RadioController:
             self.current_mode = self.fsk
         self.lora._transmited = self._on_transmited
         self.fsk._transmited = self._on_transmited
-        self.on_received: CALLBACK | None = None
-        self.on_transmited: CALLBACK | None = None
+        self.on_received: RX_CALLBACK | None = None
+        self.on_transmited: TX_CALLBACK | None = None
         self._tx_buffer: list[LoRaTxPacket | FSK_TX_Packet] = []
         self._rx_buffer: list[LoRaRxPacket | FSK_RX_Packet] = []
 
@@ -177,7 +178,7 @@ class RadioController:
                 await self.send_single(data.encode())
 
 
-async def on_received(data: LoRaRxPacket):
+def on_received(data: LoRaRxPacket | FSK_RX_Packet):
     print(data)
 
 async def on_transmited(data: LoRaTxPacket | FSK_TX_Packet):

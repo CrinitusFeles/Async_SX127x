@@ -47,7 +47,6 @@ class RadioPacket(BaseModel):
     def serialize_data(self, dt: bytes, _info):
         return dt.hex(' ').upper()
 
-
 class LoRaRxPacket(RadioPacket):
     snr: int
     rssi_pkt: int

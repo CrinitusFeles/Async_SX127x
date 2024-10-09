@@ -14,8 +14,7 @@ from async_sx127x.registers import (SX127x_FSK_SHAPING, SX127x_RestartRxMode,
 
 
 lock = Lock()
-CALLBACK = Callable[..., Coroutine | FSK_TX_Packet]
-
+CALLBACK = Callable[[FSK_TX_Packet], Coroutine | None]
 
 class FSK_Controller:
     freq_hz: int

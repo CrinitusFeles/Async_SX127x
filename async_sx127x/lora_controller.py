@@ -16,7 +16,7 @@ async def ainput(prompt: str = "") -> str:
 
 
 lock = asyncio.Lock()
-CALLBACK = Callable[..., Coroutine | LoRaTxPacket]
+CALLBACK = Callable[[LoRaTxPacket], Coroutine | None]
 
 
 class LoRa_Controller:
