@@ -2,9 +2,8 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, UTC
 from ast import literal_eval
-from typing import Awaitable, Callable, Iterable
+from typing import Awaitable, Callable, Coroutine, Iterable
 from loguru import logger
-from event import Event
 from async_sx127x.driver import SX127x_Driver
 from async_sx127x.models import (LoRaModel, LoRaRxPacket, LoRaTxPacket,
                                  RadioModel)
@@ -15,7 +14,10 @@ from async_sx127x.registers import (SX127x_BW, SX127x_CR, SX127x_HeaderMode,
 async def ainput(prompt: str = "") -> str:
     return await asyncio.to_thread(input, prompt)
 
+
 lock = asyncio.Lock()
+CALLBACK = Callable[..., Coroutine | LoRaTxPacket]
+
 
 class LoRa_Controller:
     freq_hz: int
@@ -49,32 +51,33 @@ class LoRa_Controller:
         self.header_mode = kwargs.get('header_mode', SX127x_HeaderMode.EXPLICIT)
         self.ldro = kwargs.get('ldro', True)
         self.label: str = kwargs.get('label', '')
-        self._transmited: Event = Event(LoRaTxPacket)
+        self._transmited: CALLBACK | None = None
         self._last_caller: str = ''
         self._last_rx: LoRaRxPacket | None = None
 
     async def init(self)  -> None:
-        await self.driver.reset()
-        await asyncio.sleep(0.1)
-        await self.driver.set_modulation(SX127x_Modulation.LORA)
-        await self.driver.set_lora_header_mode(self.header_mode)
-        if self.header_mode == SX127x_HeaderMode.IMPLICIT:
-            await self.driver.set_lora_payload_length(self.payload_length)
-        await self.driver.set_lora_coding_rate(self.coding_rate)
-        await self.driver.set_lora_bandwidth(self.bandwidth)
-        await self.driver.set_lora_sf(self.spread_factor)
-        await self.driver.set_lora_crc_mode(self.crc_mode)
-        await self.driver.set_tx_power(self.tx_power)
-        await self.driver.set_lora_sync_word(self.sync_word)
-        await self.driver.set_lora_preamble_length(self.preamble_length)
-        await self.driver.set_lora_auto_gain_control(self.auto_gain_control)
-        # if not self.auto_gain_control:
-        await self.driver.set_low_noize_amplifier(self.lna_val,
-                                                self.lna_boost)
-        await self.driver.set_lora_rx_tx_fifo_base_addr(0, 0)
-        await self.driver.set_frequency(self.freq_hz)
-        await self.driver.set_low_data_rate_optimize(self.ldro)
-        await self.driver.set_rx_continuous_mode()
+        async with lock:
+            await self.driver.reset()
+            await asyncio.sleep(0.1)
+            await self.driver.set_modulation(SX127x_Modulation.LORA)
+            await self.driver.set_lora_header_mode(self.header_mode)
+            if self.header_mode == SX127x_HeaderMode.IMPLICIT:
+                await self.driver.set_lora_payload_length(self.payload_length)
+            await self.driver.set_lora_coding_rate(self.coding_rate)
+            await self.driver.set_lora_bandwidth(self.bandwidth)
+            await self.driver.set_lora_sf(self.spread_factor)
+            await self.driver.set_lora_crc_mode(self.crc_mode)
+            await self.driver.set_tx_power(self.tx_power)
+            await self.driver.set_lora_sync_word(self.sync_word)
+            await self.driver.set_lora_preamble_length(self.preamble_length)
+            await self.driver.set_lora_auto_gain_control(self.auto_gain_control)
+            # if not self.auto_gain_control:
+            await self.driver.set_low_noize_amplifier(self.lna_val,
+                                                    self.lna_boost)
+            await self.driver.set_lora_rx_tx_fifo_base_addr(0, 0)
+            await self.driver.set_frequency(self.freq_hz)
+            await self.driver.set_low_data_rate_optimize(self.ldro)
+            await self.driver.set_rx_continuous_mode()
 
     async def to_model(self) -> RadioModel:
         model = LoRaModel(spreading_factor=self.spread_factor,
@@ -131,7 +134,9 @@ class LoRa_Controller:
             logger.debug(tx_chunk)
             await self.driver.write_fifo(chunk, is_implicit)
             await self.driver.interface.run_tx_then_rx_cont()
-            await self._transmited.aemit(tx_chunk)
+            if self._transmited is not None:
+                if asyncio.iscoroutinefunction(self._transmited):
+                    asyncio.create_task(self._transmited(tx_chunk))
             await asyncio.sleep((tx_chunk.Tpkt + 10) / 1000)
 
     async def send_single(self, data: bytes,
@@ -147,7 +152,9 @@ class LoRa_Controller:
             is_implicit: bool = (self.header_mode == SX127x_HeaderMode.IMPLICIT)
             await self.driver.write_fifo(data, is_implicit)
             await self.driver.interface.run_tx_then_rx_cont()
-            await self._transmited.aemit(tx_pkt)
+            if self._transmited is not None:
+                if asyncio.iscoroutinefunction(self._transmited):
+                    asyncio.create_task(self._transmited(tx_pkt))
             await asyncio.sleep((tx_pkt.Tpkt) / 1000)
             await self.driver.reset_irq_flags()
         return tx_pkt
@@ -178,7 +185,7 @@ class LoRa_Controller:
                             data=packet,
                             data_len=len(packet),
                             frequency=self.freq_hz,
-                            Tpkt=packet_time,
+                            Tpkt=int(packet_time),
                             low_datarate_opt_flag=optimization_flag)
 
     async def send_repeat(self, data: bytes | Callable[..., bytes],

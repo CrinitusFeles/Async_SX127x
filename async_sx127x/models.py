@@ -67,7 +67,7 @@ class LoRaRxPacket(RadioPacket):
 
 
 class LoRaTxPacket(RadioPacket):
-    Tpkt: float
+    Tpkt: int
     low_datarate_opt_flag: bool
     mode: str = 'LoRa'
     caller: str = ''
