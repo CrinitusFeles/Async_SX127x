@@ -93,7 +93,8 @@ class RadioController:
                         ldro: bool | None = None,
                         crc_en: bool | None = None,
                         sync_word: int | None = None,
-                        preamble_length: int | None = None
+                        preamble_length: int | None = None,
+                        tx_power: int | None = None
                         ) -> None:
         if sf is not None:
             self.lora.spread_factor = sf
@@ -111,6 +112,8 @@ class RadioController:
             self.lora.sync_word = sync_word
         if preamble_length is not None:
             self.lora.preamble_length = preamble_length
+        if tx_power is not None:
+            self.lora.tx_power = tx_power
         await self.lora.init()
         self.current_mode = self.lora
 
