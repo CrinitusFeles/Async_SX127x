@@ -17,7 +17,7 @@ async def ainput(prompt: str = "") -> str:
 
 lock = asyncio.Lock()
 CALLBACK = Callable[[LoRaTxPacket], Coroutine | None]
-
+ANSWER_CALLBACK = Callable[[LoRaRxPacket, Iterable], Awaitable[bool] | bool]
 
 class LoRa_Controller:
     freq_hz: int
@@ -192,8 +192,7 @@ class LoRa_Controller:
                           period_sec: float,
                           untill_answer: bool = True,
                           max_retries: int = 50,
-                          handler: Callable[[LoRaRxPacket, Iterable],
-                                            Awaitable[bool]] | None = None,
+                          handler: ANSWER_CALLBACK | None = None,
                           handler_args: Iterable = (),
                           caller_name: str = '') -> LoRaRxPacket | None:
         last_rx_packet: LoRaRxPacket | None = None
@@ -208,8 +207,12 @@ class LoRa_Controller:
                 last_rx_packet = rx_packet
                 if rx_packet.crc_correct and untill_answer:
                     if handler:
-                        if await handler(rx_packet, *handler_args):
-                            break
+                        if asyncio.iscoroutinefunction(handler):
+                            if await handler(rx_packet, *handler_args):
+                                break
+                        else:
+                            if handler(rx_packet, *handler_args):
+                                break
                     else:
                         break
             except asyncio.TimeoutError:

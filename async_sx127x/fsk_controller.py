@@ -15,6 +15,8 @@ from async_sx127x.registers import (SX127x_FSK_SHAPING, SX127x_RestartRxMode,
 
 lock = Lock()
 CALLBACK = Callable[[FSK_TX_Packet], Coroutine | None]
+ANSWER_CALLBACK = Callable[[FSK_RX_Packet, Iterable], Awaitable[bool] | bool]
+
 
 class FSK_Controller:
     freq_hz: int
@@ -175,8 +177,7 @@ class FSK_Controller:
                           period_sec: float,
                           untill_answer: bool = True,
                           max_retries: int = 50,
-                          handler: Callable[[FSK_RX_Packet, Iterable],
-                                                   Awaitable[bool]] | None = None,
+                          handler: ANSWER_CALLBACK | None = None,
                           handler_args: Iterable = (),
                           caller_name: str = '') -> FSK_RX_Packet | None:
         last_rx_packet: FSK_RX_Packet | None = None
@@ -190,8 +191,12 @@ class FSK_Controller:
                     last_rx_packet = rx_packet
                     if rx_packet.crc_correct and untill_answer:
                         if handler:
-                            if await handler(rx_packet, *handler_args):
-                                break
+                            if asyncio.iscoroutinefunction(handler):
+                                if await handler(rx_packet, *handler_args):
+                                    break
+                            else:
+                                if handler(rx_packet, *handler_args):
+                                    break
                         else:
                             break
                 except asyncio.TimeoutError:

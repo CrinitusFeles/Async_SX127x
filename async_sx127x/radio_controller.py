@@ -16,7 +16,8 @@ async def ainput(prompt: str = "") -> str:
 
 RX_CALLBACK = Callable[[LoRaRxPacket | FSK_RX_Packet], Coroutine | None]
 TX_CALLBACK = Callable[[LoRaTxPacket | FSK_TX_Packet], Coroutine | None]
-
+ANSWER_CALLBACK = Callable[[LoRaRxPacket | FSK_RX_Packet, Iterable],
+                           Awaitable[bool] | bool]
 
 class RadioController:
     def __init__(self, mode: Literal['lora', 'fsk'] = 'lora', **kwargs) -> None:
@@ -96,8 +97,7 @@ class RadioController:
                           period_sec: float,
                           untill_answer: bool = True,
                           max_retries: int = 50,
-                          answer_handler: Callable[[RadioPacket, Iterable],
-                                                   Awaitable[bool]] | None = None,
+                          answer_handler: ANSWER_CALLBACK | None = None,
                           handler_args: Iterable = (),
                           caller_name: str = '') -> RadioPacket | None:
         return await self.current_mode.send_repeat(data, period_sec,
