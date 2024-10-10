@@ -141,7 +141,6 @@ class RadioController:
             while True:
                 pkt = await self.current_mode.check_rx_input()
                 if pkt:
-                    self._rx_buffer.append(pkt)
                     logger.debug(pkt)
                     self._rx_buffer.append(pkt)
                     self.received.emit(pkt)
