@@ -1,8 +1,9 @@
 import asyncio
 from random import randint
-from typing import Awaitable, Callable, Coroutine, Iterable, Literal
+from typing import Awaitable, Callable, Iterable, Literal
 
 from loguru import logger
+from event import Event
 from async_sx127x.driver import SX127x_Driver
 from async_sx127x.fsk_controller import FSK_Controller
 from async_sx127x.lora_controller import LoRa_Controller
@@ -15,8 +16,6 @@ async def ainput(prompt: str = "") -> str:
     return await asyncio.to_thread(input, prompt)
 
 
-RX_CALLBACK = Callable[[LoRaRxPacket | FSK_RX_Packet], Coroutine | None]
-TX_CALLBACK = Callable[[LoRaTxPacket | FSK_TX_Packet], Coroutine | None]
 ANSWER_CALLBACK = Callable[[LoRaRxPacket | FSK_RX_Packet, Iterable],
                            Awaitable[bool] | bool]
 
@@ -30,10 +29,10 @@ class RadioController:
             self.current_mode: LoRa_Controller | FSK_Controller = self.lora
         else:
             self.current_mode = self.fsk
-        self.lora._transmited = self._on_transmited
-        self.fsk._transmited = self._on_transmited
-        self.on_received: RX_CALLBACK | None = None
-        self.on_transmited: TX_CALLBACK | None = None
+        self.lora._transmited.subscribe(self._on_transmited)
+        self.fsk._transmited.subscribe(self._on_transmited)
+        self.received: Event = Event(LoRaRxPacket | FSK_RX_Packet)
+        self.transmited: Event = Event(LoRaTxPacket | FSK_TX_Packet)
         self._tx_buffer: list[LoRaTxPacket | FSK_TX_Packet] = []
         self._rx_buffer: list[LoRaRxPacket | FSK_RX_Packet] = []
 
@@ -57,11 +56,7 @@ class RadioController:
 
     async def _on_transmited(self, pkt: LoRaTxPacket | FSK_TX_Packet):
         self._tx_buffer.append(pkt)
-        if self.on_transmited is not None:
-            if asyncio.iscoroutinefunction(self.on_transmited):
-                asyncio.create_task(self.on_transmited(pkt))
-            else:
-                self.on_transmited(pkt)
+        self.transmited.emit(pkt)
 
     def clear_subscribers(self) -> None:
         self._last_caller: str = ''
@@ -149,11 +144,7 @@ class RadioController:
                     self._rx_buffer.append(pkt)
                     logger.debug(pkt)
                     self._rx_buffer.append(pkt)
-                    if self.on_received is not None:
-                        if asyncio.iscoroutinefunction(self.on_received):
-                            asyncio.create_task(self.on_received(pkt))
-                        else:
-                            self.on_received(pkt)
+                    self.received.emit(pkt)
         except (RuntimeError, ConnectionResetError) as err:
             logger.error(err)
         except asyncio.CancelledError:
@@ -224,8 +215,8 @@ if __name__ == '__main__':
                                               interface='Serial',
                                               frequency=401_500_000,
                                               tx_power=3)
-    device.on_received = on_received
-    device.on_transmited = on_transmited
+    device.received.subscribe(on_received)
+    device.transmited.subscribe(on_transmited)
     try:
         asyncio.run(test())
     except KeyboardInterrupt:

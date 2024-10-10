@@ -1,10 +1,11 @@
 
 
 import asyncio
-from asyncio import Lock, create_task, iscoroutinefunction, wait_for
+from asyncio import Lock, wait_for
 from datetime import datetime
-from typing import Awaitable, Callable, Coroutine, Iterable
+from typing import Awaitable, Callable, Iterable
 from loguru import logger
+from event import Event
 from async_sx127x.driver import SX127x_Driver
 from async_sx127x.models import (FSK_Model, FSK_RX_Packet, FSK_TX_Packet,
                                  RadioModel)
@@ -14,7 +15,6 @@ from async_sx127x.registers import (SX127x_FSK_SHAPING, SX127x_RestartRxMode,
 
 
 lock = Lock()
-CALLBACK = Callable[[FSK_TX_Packet], Coroutine | None]
 ANSWER_CALLBACK = Callable[[FSK_RX_Packet, Iterable], Awaitable[bool] | bool]
 
 
@@ -51,7 +51,7 @@ class FSK_Controller:
                                           SX127x_RestartRxMode.NO_WAIT_PLL)
         self.label: str = kwargs.get('label', '')
         self._last_caller_name: str = ''
-        self._transmited: CALLBACK | None = None
+        self._transmited: Event = Event(FSK_TX_Packet)
 
     async def init(self, ax25_mode: bool = False) -> None:
         async with lock:
@@ -144,9 +144,7 @@ class FSK_Controller:
             await self.driver.set_rx_continuous_mode()
             while 'MODE_READY' not in await self.driver.get_fsk_isr_list():
                 pass
-            if self._transmited is not None:
-                if iscoroutinefunction(self._transmited):
-                    create_task(self._transmited(tx_frame))
+            self._transmited.emit(tx_frame)
             await self.driver.interface.write_fsk_read_start()
             return tx_frame
 

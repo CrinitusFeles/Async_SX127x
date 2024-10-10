@@ -2,8 +2,9 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, UTC
 from ast import literal_eval
-from typing import Awaitable, Callable, Coroutine, Iterable
+from typing import Awaitable, Callable, Iterable
 from loguru import logger
+from event import Event
 from async_sx127x.driver import SX127x_Driver
 from async_sx127x.models import (LoRaModel, LoRaRxPacket, LoRaTxPacket,
                                  RadioModel)
@@ -16,7 +17,6 @@ async def ainput(prompt: str = "") -> str:
 
 
 lock = asyncio.Lock()
-CALLBACK = Callable[[LoRaTxPacket], Coroutine | None]
 ANSWER_CALLBACK = Callable[[LoRaRxPacket, Iterable], Awaitable[bool] | bool]
 
 class LoRa_Controller:
@@ -51,7 +51,7 @@ class LoRa_Controller:
         self.header_mode = kwargs.get('header_mode', SX127x_HeaderMode.EXPLICIT)
         self.ldro = kwargs.get('ldro', True)
         self.label: str = kwargs.get('label', '')
-        self._transmited: CALLBACK | None = None
+        self._transmited: Event = Event(LoRaTxPacket)
         self._last_caller: str = ''
         self._last_rx: LoRaRxPacket | None = None
 
@@ -134,9 +134,7 @@ class LoRa_Controller:
             logger.debug(tx_chunk)
             await self.driver.write_fifo(chunk, is_implicit)
             await self.driver.interface.run_tx_then_rx_cont()
-            if self._transmited is not None:
-                if asyncio.iscoroutinefunction(self._transmited):
-                    asyncio.create_task(self._transmited(tx_chunk))
+            self._transmited.emit(tx_chunk)
             await asyncio.sleep((tx_chunk.Tpkt + 10) / 1000)
 
     async def send_single(self, data: bytes,
@@ -152,9 +150,7 @@ class LoRa_Controller:
             is_implicit: bool = (self.header_mode == SX127x_HeaderMode.IMPLICIT)
             await self.driver.write_fifo(data, is_implicit)
             await self.driver.interface.run_tx_then_rx_cont()
-            if self._transmited is not None:
-                if asyncio.iscoroutinefunction(self._transmited):
-                    asyncio.create_task(self._transmited(tx_pkt))
+            self._transmited.emit(tx_pkt)
             await asyncio.sleep((tx_pkt.Tpkt) / 1000)
             await self.driver.reset_irq_flags()
         return tx_pkt

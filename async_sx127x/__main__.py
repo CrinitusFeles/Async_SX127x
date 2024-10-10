@@ -22,8 +22,8 @@ if __name__ == '__main__':
                                               interface='Serial',
                                               frequency=437_501_400,
                                               tx_power=3)
-    device.on_received = on_received
-    device.on_transmited = on_transmited
+    device.received.subscribe(on_received)
+    device.transmited.subscribe(on_transmited)
     try:
         asyncio.run(test())
     except KeyboardInterrupt:
