@@ -7,7 +7,7 @@ from event import Event
 from async_sx127x.driver import SX127x_Driver
 from async_sx127x.models import (LoRaModel, LoRaRxPacket, LoRaTxPacket,
                                  RadioModel)
-from async_sx127x.registers import (SX127x_CR, SX127x_HeaderMode,
+from async_sx127x.registers import (SX127x_HeaderMode,
                                     SX127x_Modulation, SX127x_Registers)
 
 
@@ -23,7 +23,7 @@ class LoRa_Controller:
     freq_hz: int
     crc_mode: bool
     tx_power: int
-    coding_rate: SX127x_CR
+    coding_rate: int
     bandwidth: float | int
     spread_factor: int
     sync_word: int
@@ -39,7 +39,7 @@ class LoRa_Controller:
         self.freq_hz = kwargs.get('frequency', 433_000_000)   # 436700000
         self.crc_mode = kwargs.get('crc_mode', True)  # check crc
         self.tx_power = kwargs.get('tx_power', 17)  # dBm
-        self.coding_rate = kwargs.get('ecr', SX127x_CR.CR5)  # error coding rate
+        self.coding_rate = kwargs.get('cr', 5)  # error coding rate
         self.bandwidth = kwargs.get('bw', 250)  # bandwidth  BW250
         self.spread_factor = kwargs.get('sf', 10)  # spreading factor  SF10
         self.sync_word = kwargs.get('sync_word', 0x12)
@@ -83,7 +83,7 @@ class LoRa_Controller:
         model = LoRaModel(spreading_factor=self.spread_factor,
                           bandwidth=self.bandwidth,
                           sync_word=self.sync_word,
-                          coding_rate=self.coding_rate.name,
+                          coding_rate=self.coding_rate,
                           lna_boost=self.lna_boost,
                           lna_gain=self.lna_val,
                           header_mode=self.header_mode.name,
@@ -97,7 +97,7 @@ class LoRa_Controller:
 
     async def read_config(self) -> RadioModel:
         bw: int | float = (await self.driver.get_lora_bandwidth())
-        cr: str = (await self.driver.get_lora_coding_rate()).name
+        cr: int = await self.driver.get_lora_coding_rate()
         header_mode: str = (await self.driver.get_lora_header_mode()).name
         crc: bool = await self.driver.get_lora_crc_mode()
         sf: int = await self.driver.get_lora_sf()
@@ -158,7 +158,7 @@ class LoRa_Controller:
     def calculate_packet(self, packet: bytes,
                          force_optimization=True) -> LoRaTxPacket:
         sf: int = self.spread_factor
-        cr: int = self.coding_rate.value >> 1
+        cr: int = self.coding_rate - 4
         if self.header_mode == SX127x_HeaderMode.IMPLICIT:
             payload_size = self.payload_length
         else:

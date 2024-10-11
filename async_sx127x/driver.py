@@ -38,6 +38,12 @@ class SX127x_Driver:
         250: SX127x_BW.BW250,
         500: SX127x_BW.BW500
     }
+    cr: dict[int, SX127x_CR] = {
+        5: SX127x_CR.CR5,
+        6: SX127x_CR.CR6,
+        7: SX127x_CR.CR7,
+        8: SX127x_CR.CR8
+    }
 
     def __init__(self, interface: Literal['Ethernet', 'Serial'] = 'Ethernet',
                  **kwargs) -> None:
@@ -102,16 +108,16 @@ class SX127x_Driver:
         result: int = await self.interface.read(addr)
         return SX127x_HeaderMode(result & 0x01)
 
-    async def set_lora_coding_rate(self, coding_rate: SX127x_CR) -> None:
-        addr =SX127x_Registers.LORA_MODEM_CONFIG_1.value
+    async def set_lora_coding_rate(self, coding_rate: int) -> None:
+        addr = SX127x_Registers.LORA_MODEM_CONFIG_1.value
         cr: int = await self.interface.read(addr) & 0xF1
-        await self.interface.write(addr, [cr | coding_rate.value])
+        await self.interface.write(addr, [cr | self.cr[coding_rate].value])
 
     # @exception_handler
-    async def get_lora_coding_rate(self) -> SX127x_CR:
+    async def get_lora_coding_rate(self) -> int:
         addr = SX127x_Registers.LORA_MODEM_CONFIG_1.value
         result: int = await self.interface.read(addr)
-        return SX127x_CR(result & 0x0E)
+        return literal_eval(SX127x_CR(result & 0x0E).name.replace('CR', ''))
 
     async def set_lora_bandwidth(self, bandwidth: SX127x_BW) -> None:
         addr = SX127x_Registers.LORA_MODEM_CONFIG_1.value
