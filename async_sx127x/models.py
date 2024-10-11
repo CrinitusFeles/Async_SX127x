@@ -4,7 +4,7 @@ from pydantic import BaseModel, field_serializer
 class LoRaModel(BaseModel):
     spreading_factor: int
     coding_rate: str
-    bandwidth: str
+    bandwidth: float | int
     sync_word: int
     autogain_control: bool
     lna_gain: int

@@ -1,19 +1,19 @@
 from __future__ import annotations
 import asyncio
 from datetime import datetime, UTC
-from ast import literal_eval
 from typing import Awaitable, Callable, Iterable
 from loguru import logger
 from event import Event
 from async_sx127x.driver import SX127x_Driver
 from async_sx127x.models import (LoRaModel, LoRaRxPacket, LoRaTxPacket,
                                  RadioModel)
-from async_sx127x.registers import (SX127x_BW, SX127x_CR, SX127x_HeaderMode,
+from async_sx127x.registers import (SX127x_CR, SX127x_HeaderMode,
                                     SX127x_Modulation, SX127x_Registers)
 
 
 async def ainput(prompt: str = "") -> str:
     return await asyncio.to_thread(input, prompt)
+
 
 
 lock = asyncio.Lock()
@@ -24,7 +24,7 @@ class LoRa_Controller:
     crc_mode: bool
     tx_power: int
     coding_rate: SX127x_CR
-    bandwidth: SX127x_BW
+    bandwidth: float | int
     spread_factor: int
     sync_word: int
     preamble_length: int
@@ -40,7 +40,7 @@ class LoRa_Controller:
         self.crc_mode = kwargs.get('crc_mode', True)  # check crc
         self.tx_power = kwargs.get('tx_power', 17)  # dBm
         self.coding_rate = kwargs.get('ecr', SX127x_CR.CR5)  # error coding rate
-        self.bandwidth = kwargs.get('bw', SX127x_BW.BW250)  # bandwidth  BW250
+        self.bandwidth = kwargs.get('bw', 250)  # bandwidth  BW250
         self.spread_factor = kwargs.get('sf', 10)  # spreading factor  SF10
         self.sync_word = kwargs.get('sync_word', 0x12)
         self.preamble_length = kwargs.get('preamble_length', 8)
@@ -64,7 +64,7 @@ class LoRa_Controller:
             if self.header_mode == SX127x_HeaderMode.IMPLICIT:
                 await self.driver.set_lora_payload_length(self.payload_length)
             await self.driver.set_lora_coding_rate(self.coding_rate)
-            await self.driver.set_lora_bandwidth(self.bandwidth)
+            await self.driver.set_lora_bandwidth(self.driver.bw[self.bandwidth])
             await self.driver.set_lora_sf(self.spread_factor)
             await self.driver.set_lora_crc_mode(self.crc_mode)
             await self.driver.set_tx_power(self.tx_power)
@@ -81,7 +81,7 @@ class LoRa_Controller:
 
     async def to_model(self) -> RadioModel:
         model = LoRaModel(spreading_factor=self.spread_factor,
-                          bandwidth=self.bandwidth.name,
+                          bandwidth=self.bandwidth,
                           sync_word=self.sync_word,
                           coding_rate=self.coding_rate.name,
                           lna_boost=self.lna_boost,
@@ -96,7 +96,7 @@ class LoRa_Controller:
                           tx_power=self.tx_power)
 
     async def read_config(self) -> RadioModel:
-        bw: str = (await self.driver.get_lora_bandwidth()).name
+        bw: int | float = (await self.driver.get_lora_bandwidth())
         cr: str = (await self.driver.get_lora_coding_rate()).name
         header_mode: str = (await self.driver.get_lora_header_mode()).name
         crc: bool = await self.driver.get_lora_crc_mode()
@@ -158,14 +158,12 @@ class LoRa_Controller:
     def calculate_packet(self, packet: bytes,
                          force_optimization=True) -> LoRaTxPacket:
         sf: int = self.spread_factor
-        _str_bw: str = self.bandwidth.name.replace('BW', '').replace('_', '.')
-        bw: int | float = literal_eval(_str_bw)
         cr: int = self.coding_rate.value >> 1
         if self.header_mode == SX127x_HeaderMode.IMPLICIT:
             payload_size = self.payload_length
         else:
             payload_size: int = len(packet)
-        t_sym: float = 2 ** sf / bw  # ms
+        t_sym: float = 2 ** sf / self.bandwidth  # ms
         optimization_flag: bool = True if force_optimization else t_sym > 16
         preamble_time: float = (self.preamble_length + 4.25) * t_sym
         _tmp_1: int = 8 * payload_size - 4 * sf + 28
@@ -235,7 +233,7 @@ class LoRa_Controller:
             data = await self.driver.read_lora_fifo(rx_amount)
         crc_error: bool = await self.driver.get_crc_flag()
         await self.driver.reset_irq_flags()
-        bw: float = await self.driver.get_lora_bw_khz()
+        bw: float | int = await self.driver.get_lora_bandwidth()
         fei: int = await self.driver.get_lora_fei(bw)
         timestamp: str = datetime.now(UTC).isoformat(' ', 'seconds')
         snr, rssi = await self.driver.get_snr_and_rssi(self.freq_hz)

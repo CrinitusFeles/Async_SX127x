@@ -9,7 +9,7 @@ from async_sx127x.fsk_controller import FSK_Controller
 from async_sx127x.lora_controller import LoRa_Controller
 from async_sx127x.models import (FSK_RX_Packet, FSK_TX_Packet, LoRaRxPacket,
                                  LoRaTxPacket, RadioModel)
-from async_sx127x.registers import SX127x_BW, SX127x_CR
+from async_sx127x.registers import SX127x_CR
 
 
 async def ainput(prompt: str = "") -> str:
@@ -82,7 +82,7 @@ class RadioController:
         return await self.current_mode.to_model()
 
     async def init_lora(self, sf: int | None = None,
-                        bw: SX127x_BW | None = None,
+                        bw: int | float | None = None,
                         freq: int | None = None,
                         cr: SX127x_CR | None = None,
                         ldro: bool | None = None,

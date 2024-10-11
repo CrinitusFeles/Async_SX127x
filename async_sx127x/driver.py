@@ -1,4 +1,5 @@
 from __future__ import annotations
+from ast import literal_eval
 import math
 from typing import Literal
 from loguru import logger
@@ -25,10 +26,18 @@ class SX127x_Driver:
     FXOSC = 32_000_000
     F_STEP: float = FXOSC / 524288
 
-    _bw_khz: dict = {key.value: value
-                     for key, value in zip(SX127x_BW, [7.8, 10.4, 15.6, 20.8,
-                                                       31.25, 41.7, 62.5, 125,
-                                                       250, 500])}
+    bw: dict[float, SX127x_BW] = {
+        7.8: SX127x_BW.BW7_8,
+        10.4: SX127x_BW.BW10_4,
+        15.6: SX127x_BW.BW15_6,
+        20.8: SX127x_BW.BW20_8,
+        31.25: SX127x_BW.BW31_25,
+        41.7: SX127x_BW.BW41_7,
+        62.5: SX127x_BW.BW62_5,
+        125: SX127x_BW.BW125,
+        250: SX127x_BW.BW250,
+        500: SX127x_BW.BW500
+    }
 
     def __init__(self, interface: Literal['Ethernet', 'Serial'] = 'Ethernet',
                  **kwargs) -> None:
@@ -118,14 +127,10 @@ class SX127x_Driver:
         return await self.interface.read(addr)
 
     # @exception_handler
-    async def get_lora_bandwidth(self) -> SX127x_BW:
+    async def get_lora_bandwidth(self) -> int | float:
         addr = SX127x_Registers.LORA_MODEM_CONFIG_1.value
         data: int = await self.interface.read(addr)
-        return SX127x_BW(data & 0xF0)
-
-    async def get_lora_bw_khz(self) -> float:
-        bw: SX127x_BW = await self.get_lora_bandwidth()
-        return self._bw_khz[bw.value]
+        return literal_eval(SX127x_BW(data & 0xF0).name.replace('_', '.'))
 
     async def set_lora_sf(self, spreading_factor: int) -> None:
         if 6 <= spreading_factor <= 12:
