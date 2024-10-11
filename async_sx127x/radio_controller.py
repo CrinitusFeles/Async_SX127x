@@ -132,7 +132,7 @@ class RadioController:
             result = None
         return result
 
-    def cancel_tx(self) -> bool:
+    async def cancel_tx(self) -> bool:
         if self.tx_task:
             return self.tx_task.cancel()
         return False
