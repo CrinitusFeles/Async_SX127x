@@ -140,9 +140,10 @@ class RadioController:
             result = None
         return result
 
-    def cancel_tx(self) -> None:
+    def cancel_tx(self) -> bool:
         if self.tx_task:
-            self.tx_task.cancel()
+            return self.tx_task.cancel()
+        return False
 
     async def send_single(self, data: bytes,
                           caller_name: str = '') -> LoRaTxPacket | FSK_TX_Packet:
