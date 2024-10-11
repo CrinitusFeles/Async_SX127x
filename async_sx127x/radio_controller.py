@@ -34,6 +34,7 @@ class RadioController:
         self.transmited: Event = Event(LoRaTxPacket | FSK_TX_Packet)
         self._tx_buffer: list[LoRaTxPacket | FSK_TX_Packet] = []
         self._rx_buffer: list[LoRaRxPacket | FSK_RX_Packet] = []
+        self.tx_task: asyncio.Task | None = None
 
     def connection_status(self) -> bool:
         return self.driver.interface.connection_status
@@ -122,10 +123,26 @@ class RadioController:
                           answer_handler: ANSWER_CALLBACK | None = None,
                           handler_args: Iterable = (),
                           caller_name: str = '') -> LoRaRxPacket | FSK_RX_Packet | None:
-        return await self.current_mode.send_repeat(data, period_sec,
-                                                   untill_answer,
-                                                   max_retries, answer_handler,
-                                                   handler_args, caller_name)
+        coro = self.current_mode.send_repeat(data, period_sec,
+                                                        untill_answer,
+                                                        max_retries,
+                                                        answer_handler,
+                                                        handler_args,
+                                                        caller_name)
+        self.tx_task = asyncio.create_task(coro)
+        try:
+            result = await self.tx_task
+            self.tx_task = None
+            return
+        except asyncio.CancelledError:
+            logger.debug('TX task was cancelled')
+            self.tx_task = None
+            result = None
+        return result
+
+    def cancel_tx(self) -> None:
+        if self.tx_task:
+            self.tx_task.cancel()
 
     async def send_single(self, data: bytes,
                           caller_name: str = '') -> LoRaTxPacket | FSK_TX_Packet:
