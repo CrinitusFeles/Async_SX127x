@@ -238,12 +238,12 @@ class LoRa_Controller:
         timestamp: str = datetime.now(UTC).isoformat(' ', 'seconds')
         snr, rssi = await self.driver.get_snr_and_rssi(self.freq_hz)
         self._last_rx = LoRaRxPacket(timestamp=timestamp,
-                            data=bytes(data),
-                            data_len=len(data),
-                            frequency=self.freq_hz,
-                            snr=snr,
-                            rssi_pkt=rssi,
-                            crc_correct=not crc_error,
-                            fei=fei,
-                            caller=self._last_caller)
+                                     data=bytes(data),
+                                     data_len=len(data),
+                                     frequency=self.freq_hz,
+                                     snr=snr,
+                                     rssi_pkt=rssi,
+                                     crc_correct=not crc_error,
+                                     fei=fei,
+                                     caller=self._last_caller)
         return self._last_rx

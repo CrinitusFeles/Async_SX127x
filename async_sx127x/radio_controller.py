@@ -58,13 +58,6 @@ class RadioController:
         self._tx_buffer.append(pkt)
         self.transmited.emit(pkt)
 
-    def clear_subscribers(self) -> None:
-        self._last_caller: str = ''
-
-    def clear(self) -> None:
-        self.clear_subscribers()
-        self.clear_buffers()
-
     def clear_buffers(self) -> None:
         self._rx_buffer.clear()
         self._tx_buffer.clear()
