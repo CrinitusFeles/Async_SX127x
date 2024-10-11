@@ -130,7 +130,8 @@ class SX127x_Driver:
     async def get_lora_bandwidth(self) -> int | float:
         addr = SX127x_Registers.LORA_MODEM_CONFIG_1.value
         data: int = await self.interface.read(addr)
-        return literal_eval(SX127x_BW(data & 0xF0).name.replace('_', '.'))
+        val: str = SX127x_BW(data & 0xF0).name.replace('_', '.')
+        return literal_eval(val.replace('BW', ''))
 
     async def set_lora_sf(self, spreading_factor: int) -> None:
         if 6 <= spreading_factor <= 12:
