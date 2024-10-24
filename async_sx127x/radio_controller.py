@@ -126,10 +126,11 @@ class RadioController:
         try:
             result = await self.tx_task
             self.tx_task = None
-        except asyncio.CancelledError:
+        except asyncio.CancelledError as err:
             logger.debug('TX task was cancelled')
             self.tx_task = None
             result = None
+            raise err
         return result
 
     async def cancel_tx(self) -> bool:
