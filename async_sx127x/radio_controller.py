@@ -1,6 +1,6 @@
 import asyncio
 from random import randint
-from typing import Awaitable, Callable, Iterable, Literal
+from typing import Awaitable, Callable, Coroutine, Iterable, Literal
 
 from loguru import logger
 from event import Event
@@ -116,7 +116,7 @@ class RadioController:
                           answer_handler: ANSWER_CALLBACK | None = None,
                           handler_args: Iterable = (),
                           caller_name: str = '') -> LoRaRxPacket | FSK_RX_Packet | None:
-        coro = self.current_mode.send_repeat(data, period_sec,
+        coro: Coroutine = self.current_mode.send_repeat(data, period_sec,
                                                         untill_answer,
                                                         max_retries,
                                                         answer_handler,
@@ -150,6 +150,7 @@ class RadioController:
         try:
             while True:
                 pkt = await self.current_mode.check_rx_input()
+                self.current_mode._last_caller_name = ''
                 if pkt:
                     logger.debug(pkt)
                     self._rx_buffer.append(pkt)

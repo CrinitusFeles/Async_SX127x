@@ -157,12 +157,14 @@ class FSK_Controller:
                 rx_data: bytes = await self.driver.interface.write_fsk_read()
                 await self.driver.interface.write_fsk_read_start()
                 rssi: int = await self.driver.get_fsk_rssi()
-                return FSK_RX_Packet(timestamp=timestamp, data=rx_data,
-                                    data_len=len(rx_data),
-                                    frequency=self.freq_hz,
-                                    crc_correct=crc_correct,
-                                    rssi=rssi,
-                                    caller=self._last_caller_name)
+                rx_packet =  FSK_RX_Packet(timestamp=timestamp,
+                                           data=rx_data,
+                                           data_len=len(rx_data),
+                                           frequency=self.freq_hz,
+                                           crc_correct=crc_correct,
+                                           rssi=rssi,
+                                           caller=self._last_caller_name)
+                return rx_packet
             return None
 
     async def _wait_rx(self) -> FSK_RX_Packet:

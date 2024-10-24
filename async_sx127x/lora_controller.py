@@ -52,7 +52,7 @@ class LoRa_Controller:
         self.ldro = kwargs.get('ldro', True)
         self.label: str = kwargs.get('label', '')
         self._transmited: Event = Event(LoRaTxPacket)
-        self._last_caller: str = ''
+        self._last_caller_name: str = ''
         self._last_rx: LoRaRxPacket | None = None
 
     async def init(self)  -> None:
@@ -142,7 +142,7 @@ class LoRa_Controller:
         buffer_size: int = 255
         tx_pkt: LoRaTxPacket = self.calculate_packet(data)
         tx_pkt.caller = caller_name
-        self._last_caller = caller_name
+        self._last_caller_name = caller_name
         logger.debug(f'{self.label} {tx_pkt}')
         if len(data) > buffer_size:
             await self._send_chunks(data, buffer_size)
@@ -245,5 +245,5 @@ class LoRa_Controller:
                                      rssi_pkt=rssi,
                                      crc_correct=not crc_error,
                                      fei=fei,
-                                     caller=self._last_caller)
+                                     caller=self._last_caller_name)
         return self._last_rx
