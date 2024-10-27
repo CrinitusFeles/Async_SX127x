@@ -152,8 +152,8 @@ class RadioController:
         try:
             while True:
                 pkt = await self.current_mode.check_rx_input()
-                self.current_mode._last_caller_name = ''
                 if pkt:
+                    self.current_mode._last_caller_name = ''
                     logger.debug(pkt)
                     self._rx_buffer.append(pkt)
                     self.received.emit(pkt)
