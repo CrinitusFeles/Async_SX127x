@@ -59,9 +59,9 @@ class LoRaRxPacket(RadioPacket):
         caller_name: str = f'[{self.caller}] ' if self.caller else ' '
         currepted_string: str = '(CORRUPTED) ' if not self.crc_correct else ' '
         return f'{self.timestamp}\n'\
-               f'{self.mode} {caller_name} {currepted_string}'\
+               f'{self.mode} {caller_name} {currepted_string}\n'\
                f'Freq: {self.frequency:_}\n'\
-               f'FEI: {self.fei}\n' \
+               f'FEI: {self.fei}\n'\
                f'RSSI: {self.rssi_pkt}\n'\
                f'SNR: {self.snr};\n'\
                f'RX[{self.data_len}] < {self.data.hex(" ").upper()}'
