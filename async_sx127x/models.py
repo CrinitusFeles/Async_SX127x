@@ -58,13 +58,13 @@ class LoRaRxPacket(RadioPacket):
     def __str__(self) -> str:
         caller_name: str = f'[{self.caller}] ' if self.caller else ' '
         currepted_string: str = '(CORRUPTED) ' if not self.crc_correct else ' '
-        return f"{self.timestamp}\n"\
-               f"{self.mode} {caller_name} {currepted_string}"\
-               f"Freq: {self.frequency:_}\n"\
-               f"FEI: {self.fei}\n" \
-               f"RSSI: {self.rssi_pkt}\n"\
-               f"SNR: {self.snr};\n"\
-               f"RX[{self.data_len}] < {self.data.hex(' ').upper()}"
+        return f'{self.timestamp}\n'\
+               f'{self.mode} {caller_name} {currepted_string}'\
+               f'Freq: {self.frequency:_}\n'\
+               f'FEI: {self.fei}\n' \
+               f'RSSI: {self.rssi_pkt}\n'\
+               f'SNR: {self.snr};\n'\
+               f'RX[{self.data_len}] < {self.data.hex(" ").upper()}'
 
 
 class LoRaTxPacket(RadioPacket):
@@ -74,10 +74,10 @@ class LoRaTxPacket(RadioPacket):
     caller: str = ''
     def __str__(self) -> str:
         caller_name: str = f'[{self.caller}] ' if self.caller else ''
-        return f"{self.timestamp}\n{self.mode} {caller_name}\n"\
-               f"Freq: {self.frequency:_}\n"\
-               f"TOF(ms): {round(self.Tpkt)};\n"\
-               f"TX[{self.data_len}] > {self.data.hex(' ').upper()}"
+        return f'{self.timestamp}\n{self.mode} {caller_name}\n'\
+               f'Freq: {self.frequency:_}\n'\
+               f'TOF(ms): {round(self.Tpkt)};\n'\
+               f'TX[{self.data_len}] > {self.data.hex(" ").upper()}'
 
 
 class FSK_RX_Packet(RadioPacket):
@@ -88,17 +88,17 @@ class FSK_RX_Packet(RadioPacket):
     def __str__(self) -> str:
         caller_name: str = f'[{self.caller}] ' if self.caller else ''
         currepted_string: str = '(CORRUPTED) ' if not self.crc_correct else ' '
-        return f"{self.timestamp}\n"\
-               f"{self.mode} {caller_name} {currepted_string}\n"\
-               f"Freq: {self.frequency:_}\n"\
-               f"RSSI: {self.rssi}\n"\
-               f"RX[{self.data_len}] < {self.data.hex(' ').upper()}"
+        return f'{self.timestamp}\n'\
+               f'{self.mode} {caller_name} {currepted_string}\n'\
+               f'Freq: {self.frequency:_}\n'\
+               f'RSSI: {self.rssi}\n'\
+               f'RX[{self.data_len}] < {self.data.hex(" ").upper()}'
 
 class FSK_TX_Packet(RadioPacket):
     mode: str = 'FSK'
     caller: str = ''
     def __str__(self) -> str:
         caller_name: str = f'[{self.caller}] ' if self.caller else ''
-        return f"{self.timestamp} {self.mode} {caller_name}\n"\
-               f"Freq: {self.frequency:_}\n"\
-               f"TX[{self.data_len}] > {self.data.hex(' ').upper()}"
+        return f'{self.timestamp} {self.mode} {caller_name}\n'\
+               f'Freq: {self.frequency:_}\n'\
+               f'TX[{self.data_len}] > {self.data.hex(" ").upper()}'
