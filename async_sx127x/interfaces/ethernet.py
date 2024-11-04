@@ -9,7 +9,8 @@ class EthernetInterface(BaseInterface):
         if self.connection_status:
             return True
         try:
-            self.reader, self.writer = await asyncio.open_connection(ip_or_port, 80)
+            ip, port = ip_or_port.split(':')
+            self.reader, self.writer = await asyncio.open_connection(ip, port)
             self._read = self.reader.read
             self._write = self._tcp_write
             self.connection_status = True

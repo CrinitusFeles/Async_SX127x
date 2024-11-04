@@ -128,6 +128,10 @@ class BaseInterface:
             data: bytes = await self._read(amount)
             if data == b'':
                 raise RuntimeError('Radio read empty data')
+            if len(data) != amount:
+                logger.debug(f'Waiting for remain data {amount - len(data)}')
+                while len(data) != amount:
+                    data += await self._read(amount)
             return data
         except TimeoutError as exc:
             raise TimeoutError(f'Radio reading timeout: {exc}') from exc
