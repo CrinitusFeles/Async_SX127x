@@ -1,7 +1,5 @@
-from __future__ import annotations
 from ast import literal_eval
 import math
-from typing import Literal
 from loguru import logger
 from async_sx127x.fsk_sequencer import Sequencer
 from async_sx127x.interfaces.base_interface import BaseInterface
@@ -19,6 +17,11 @@ def twos_comp(val, bits: int):
     if (val & (1 << (bits - 1))) != 0: # if sign bit is set e.g., 8bit: 128-255
         val = val - (1 << bits)        # compute negative value
     return val                         # return positive value as is
+
+
+def is_valid_ip(data: str) -> bool:
+    return len(data.split('.')) == 4 or data == 'localhost'
+
 
 class SX127x_Driver:
     interface: BaseInterface
@@ -45,15 +48,9 @@ class SX127x_Driver:
         8: SX127x_CR.CR8
     }
 
-    def __init__(self, interface: Literal['Ethernet', 'Serial'] = 'Ethernet',
-                 **kwargs) -> None:
-        if interface == 'Ethernet':
-            self.interface = EthernetInterface()
-        else:
-           self.interface = SerialInterface()
+    def __init__(self, **kwargs) -> None:
+        self.interface = SerialInterface()
         self.fsk_sequencer = Sequencer(self.interface)
-        if interface == 'Ethernet':
-            self.pa_boost = False
         self.pa_boost: bool = kwargs.get('pa_boost', True)
         logger.info(f'PA_BOOST = {self.pa_boost}')
 
@@ -61,6 +58,13 @@ class SX127x_Driver:
         self.interface = interface
 
     async def connect(self, port_or_ip: str) -> bool:
+        data: list[str] = port_or_ip.split(':')
+        if len(data) == 2 and is_valid_ip(data[0]):
+            logger.info(f'Connecting to TCP interface: {port_or_ip}')
+            self.interface = EthernetInterface()
+        else:
+            logger.info(f'Connection to serial interface: {port_or_ip}')
+            self.interface = SerialInterface()
         return await self.interface.connect(port_or_ip)
 
     async def disconnect(self) -> bool:

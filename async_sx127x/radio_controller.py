@@ -224,7 +224,6 @@ async def test():
 
 if __name__ == '__main__':
     device: RadioController = RadioController('lora',
-                                              interface='Serial',
                                               frequency=401_500_000,
                                               tx_power=3)
     device.received.subscribe(on_received)

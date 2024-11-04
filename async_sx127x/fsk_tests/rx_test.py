@@ -139,7 +139,7 @@ async def main():
     await user_cli()
 
 if __name__ == '__main__':
-    lora: SX127x_Driver = SX127x_Driver('Serial')
+    lora: SX127x_Driver = SX127x_Driver()
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
