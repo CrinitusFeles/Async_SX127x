@@ -116,7 +116,7 @@ class RadioController:
                           answer_handler: ANSWER_CALLBACK | None = None,
                           handler_args: Iterable = (),
                           caller_name: str = '') -> LoRaRxPacket | FSK_RX_Packet | None:
-        if self.tx_task:
+        if self.tx_task and not self.tx_task.done():
             raise RuntimeError("TX task still active")
         coro: Coroutine = self.current_mode.send_repeat(data, period_sec,
                                                         untill_answer,
