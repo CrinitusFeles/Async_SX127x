@@ -410,13 +410,13 @@ class SX127x_Driver:
 
     async def get_lora_snr(self) -> int:
         addr = SX127x_Registers.LORA_PKT_SNR_VALUE.value
-        return await self.interface.read(addr) // 4
+        return await twos_comp(self.interface.read(addr), 8) // 4
 
     async def get_snr_and_rssi(self, freq_hz: int) -> tuple[int, int]:
         addr = SX127x_Registers.LORA_PKT_SNR_VALUE.value
         data: list[int] = await self.interface.read_several(addr, 2)
         if len(data) == 2:
-            snr, rssi = data[0], data[1]
+            snr, rssi = twos_comp(data[0], 8), data[1]
             return snr // 4, rssi - (164 if freq_hz < 0x779E6 else 157)
         return 0, 0
 
