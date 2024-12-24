@@ -81,7 +81,7 @@ class LoRaTxPacket(RadioPacket):
 
 
 class FSK_RX_Packet(RadioPacket):
-    rssi: int
+    rssi_pkt: int
     crc_correct: bool
     mode: str = 'FSK'
     caller: str = ''
@@ -91,7 +91,7 @@ class FSK_RX_Packet(RadioPacket):
         return f'{self.timestamp}\n'\
                f'{self.mode} {caller_name} {currepted_string}\n'\
                f'Freq: {self.frequency:_}\n'\
-               f'RSSI: {self.rssi}\n'\
+               f'RSSI: {self.rssi_pkt}\n'\
                f'RX[{self.data_len}] < {self.data.hex(" ").upper()}'
 
 class FSK_TX_Packet(RadioPacket):
