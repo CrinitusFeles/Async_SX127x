@@ -175,7 +175,7 @@ class LoRa_Controller:
         packet_time: float = payload_time + preamble_time
         timestamp: datetime = datetime.now().astimezone()
 
-        return LoRaTxPacket(timestamp=timestamp.isoformat(' ', 'seconds'),
+        return LoRaTxPacket(timestamp=timestamp.isoformat(' ', 'milliseconds'),
                             data=packet,
                             data_len=len(packet),
                             frequency=self.freq_hz,
@@ -235,7 +235,7 @@ class LoRa_Controller:
         await self.driver.reset_irq_flags()
         bw: float | int = await self.driver.get_lora_bandwidth()
         fei: int = await self.driver.get_lora_fei(bw)
-        timestamp: str = datetime.now(UTC).isoformat(' ', 'seconds')
+        timestamp: str = datetime.now(UTC).isoformat(' ', 'milliseconds')
         snr, rssi = await self.driver.get_snr_and_rssi(self.freq_hz)
         self._last_rx = LoRaRxPacket(timestamp=timestamp,
                                      data=bytes(data),

@@ -123,7 +123,7 @@ class FSK_Controller:
         return radio_model
 
     def _tx_frame(self, data: bytes, caller_name: str) -> FSK_TX_Packet:
-        timestamp: str = datetime.now().isoformat(' ', 'seconds')
+        timestamp: str = datetime.now().isoformat(' ', 'milliseconds')
         return FSK_TX_Packet(timestamp=timestamp,
                              data = data,
                              data_len=len(data),
@@ -152,7 +152,7 @@ class FSK_Controller:
         async with lock:
             isr: list[str] = await self.driver.get_fsk_isr_list()
             if 'PAYLOAD_READY' in isr:
-                timestamp: str = datetime.now().isoformat(' ', 'seconds')
+                timestamp: str = datetime.now().isoformat(' ', 'milliseconds')
                 crc_correct: bool = 'CRC_OK' in isr
                 rx_data: bytes = await self.driver.interface.write_fsk_read()
                 await self.driver.interface.write_fsk_read_start()
