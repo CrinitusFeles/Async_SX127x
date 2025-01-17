@@ -401,12 +401,12 @@ class SX127x_Driver:
     async def get_lora_rssi_packet(self, freq_hz: int) -> int:
         addr = SX127x_Registers.LORA_PKT_RSSI_VALUE.value
         raw_val: int = await self.interface.read(addr)
-        return raw_val - (164 if freq_hz < 0x779E6 else 157)
+        return raw_val - (164 if freq_hz < 800_000_000 else 157)
 
     async def get_lora_rssi_value(self, freq_hz: int) -> int:
         addr = SX127x_Registers.LORA_RSSI_VALUE.value
         raw_val: int = await self.interface.read(addr)
-        return raw_val - (164 if freq_hz < 0x779E6 else 157)
+        return raw_val - (164 if freq_hz < 800_000_000 else 157)
 
     async def get_lora_snr(self) -> int:
         addr = SX127x_Registers.LORA_PKT_SNR_VALUE.value
@@ -417,7 +417,7 @@ class SX127x_Driver:
         data: list[int] = await self.interface.read_several(addr, 2)
         if len(data) == 2:
             snr, rssi = twos_comp(data[0], 8), data[1]
-            return snr // 4, rssi - (164 if freq_hz < 0x779E6 else 157)
+            return snr // 4, rssi - (164 if freq_hz < 800_000_000 else 157)
         return 0, 0
 
     async def set_fsk_bitrate(self, bitrate: int) -> None:
