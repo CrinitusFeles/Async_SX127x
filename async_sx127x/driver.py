@@ -544,16 +544,16 @@ class SX127x_Driver:
 
     async def add_freq_ppm(self, ppm: float) -> int:
         freq: int = await self.get_freq()
-        new_freq: int = freq - int(freq * ppm / 1_000_000)
+        new_freq: int = freq + int(freq * ppm / 1_000_000)
         await self.set_frequency(new_freq)
         return new_freq
 
     async def add_freq(self, freq_hz: int) -> int:
         freq: int = await self.get_freq()
         await self.set_standby_mode()
-        await self.set_frequency(freq - freq_hz)
+        await self.set_frequency(freq + freq_hz)
         await self.set_rx_continuous_mode()
-        return freq - freq_hz
+        return freq + freq_hz
 
     async def get_fsk_isr(self) -> int:
         addr = SX127x_Registers.FSK_IRQ_FLAGS1.value
@@ -591,7 +591,7 @@ class SX127x_Driver:
         """ Works incorrectly on sx127x """
         addr = SX127x_Registers.FSK_FEI_MSB.value
         data = bytes(await self.interface.read_several(addr, 2))
-        return int(twos_comp(int.from_bytes(data, 'big'), 16) * self.F_STEP)
+        return -int(twos_comp(int.from_bytes(data, 'big'), 16) * self.F_STEP)
 
     async def set_fsk_auto_afc(self, mode: bool):
         addr = SX127x_Registers.FSK_RX_CONFIG.value
