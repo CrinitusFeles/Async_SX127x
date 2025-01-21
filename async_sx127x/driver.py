@@ -340,7 +340,7 @@ class SX127x_Driver:
         addr = SX127x_Registers.LORA_FEI_MSB.value
         data = bytes(await self.interface.read_several(addr, 3))
         raw_val: int = twos_comp(int.from_bytes(data, 'big'), 20)
-        f_err: int = int(raw_val * (1 << 24) / self.FXOSC * bw_khz / 500)
+        f_err: int = -int(raw_val * (1 << 24) / self.FXOSC * bw_khz / 500)
         return f_err
 
     async def get_lora_isr_list(self) -> list[str]:
