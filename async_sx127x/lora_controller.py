@@ -1,6 +1,7 @@
 from __future__ import annotations
 import asyncio
 from datetime import datetime, UTC
+from math import ceil
 from typing import Awaitable, Callable, Iterable
 from loguru import logger
 from event import Event
@@ -164,23 +165,27 @@ class LoRa_Controller:
         else:
             payload_size: int = len(packet)
         t_sym: float = 2 ** sf / self.bandwidth  # ms
-        optimization_flag: bool = True if force_optimization else t_sym > 16
+        optimization_flag: bool = force_optimization#True if force_optimization else t_sym > 16
         preamble_time: float = (self.preamble_length + 4.25) * t_sym
         _tmp_1: int = 8 * payload_size - 4 * sf + 28
         _tmp_2: int = 16 * self.crc_mode - 20 * self.header_mode.value
-        tmp_poly: int = max((_tmp_1 + _tmp_2), 0)
-        _devider = (4 * (sf - 2 * optimization_flag))
-        payload_symbol_nb: float = 8 + (tmp_poly / _devider) * (4 + cr)
+        _devider: int = (4 * (sf - 2 * optimization_flag))
+        _ceil: int = ceil((_tmp_1 + _tmp_2) / _devider)
+        payload_symbol_nb: float = 8 + max(_ceil * (4 + cr), 0)
         payload_time: float = payload_symbol_nb * t_sym
         packet_time: float = payload_time + preamble_time
         timestamp: datetime = datetime.now().astimezone()
-
         return LoRaTxPacket(timestamp=timestamp.isoformat(' ', 'milliseconds'),
                             data=packet,
                             data_len=len(packet),
                             frequency=self.freq_hz,
-                            Tpkt=int(packet_time),
+                            Tpkt=packet_time,
                             low_datarate_opt_flag=optimization_flag)
+
+    def _tx_frame(self, data: bytes, caller_name: str = '') -> LoRaTxPacket:
+        frame: LoRaTxPacket = self.calculate_packet(data)
+        frame.caller = caller_name
+        return frame
 
     async def send_repeat(self, data: bytes | Callable[..., bytes],
                           period_sec: float,

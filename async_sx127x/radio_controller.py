@@ -1,5 +1,5 @@
 import asyncio
-from random import randint
+from random import randint, sample
 from typing import Awaitable, Callable, Coroutine, Iterable, Literal
 
 from loguru import logger
@@ -173,6 +173,9 @@ class RadioController:
         self.fsk.freq_hz = new_freq
         return new_freq
 
+    def tx_frame(self, data: bytes, caller_name: str = ''):
+        return self.current_mode._tx_frame(data, caller_name)
+
     async def user_cli(self) -> None:
         while True:
             data: str = await ainput('> ')
@@ -202,6 +205,11 @@ class RadioController:
                 for task in asyncio.all_tasks():
                     print(task)
                 continue
+            elif 'RANDOM' in data.upper():
+                val = int(data.split()[-1])
+                tx_list = sample(range(0, 256), val)
+                await self.send_single(bytes(tx_list))
+                continue
             try:
                 bdata: bytes = bytes.fromhex(data)
                 await self.send_single(bdata)
@@ -216,7 +224,7 @@ async def on_transmited(data: LoRaTxPacket | FSK_TX_Packet):
     print(data)
 
 async def test():
-    if await device.connect(port_or_ip='COM25'):  # 192.168.0.5
+    if await device.connect(port_or_ip='COM25'):  # 192.168.0.5:80
         print(await device.read_config())
         asyncio.create_task(device.rx_routine())
         await device.user_cli()
@@ -224,8 +232,10 @@ async def test():
 
 if __name__ == '__main__':
     device: RadioController = RadioController('lora',
-                                              frequency=401_500_000,
-                                              tx_power=3)
+                                              frequency=401_315_000,
+                                              sf=9,
+                                              bw=125,
+                                              tx_power=20)
     device.received.subscribe(on_received)
     device.transmited.subscribe(on_transmited)
     try:
