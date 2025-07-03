@@ -1,4 +1,4 @@
-from pydantic import BaseModel, field_serializer
+from pydantic import BaseModel, Field, field_serializer
 
 
 class LoRaModel(BaseModel):
@@ -42,19 +42,24 @@ class RadioPacket(BaseModel):
     data: bytes
     data_len: int
     frequency: int
+    caller: str = Field(default_factory=lambda: '')
 
     @field_serializer('data')
     def serialize_data(self, dt: bytes, _info):
         return dt.hex(' ').upper()
 
-class LoRaRxPacket(RadioPacket):
+class BaseLoRaPacket(RadioPacket):
+    mode: str = 'LoRa'
+    sf: int
+    bw: int | float
+    ldro: bool
+    Tpkt: float
+
+class LoRaRxPacket(BaseLoRaPacket):
     snr: int
     rssi_pkt: int
     crc_correct: bool
     fei: int
-    mode: str = 'LoRa'
-    caller: str = ''
-
     def __str__(self) -> str:
         caller_name: str = f'[{self.caller}] ' if self.caller else ' '
         currepted_string: str = '(CORRUPTED) ' if not self.crc_correct else ' '
@@ -67,11 +72,7 @@ class LoRaRxPacket(RadioPacket):
                f'RX[{self.data_len}] < {self.data.hex(" ").upper()}'
 
 
-class LoRaTxPacket(RadioPacket):
-    Tpkt: float
-    low_datarate_opt_flag: bool
-    mode: str = 'LoRa'
-    caller: str = ''
+class LoRaTxPacket(BaseLoRaPacket):
     def __str__(self) -> str:
         caller_name: str = f'[{self.caller}] ' if self.caller else ''
         return f'{self.timestamp}\n{self.mode} {caller_name}\n'\
@@ -84,7 +85,6 @@ class FSK_RX_Packet(RadioPacket):
     rssi_pkt: int
     crc_correct: bool
     mode: str = 'FSK'
-    caller: str = ''
     def __str__(self) -> str:
         caller_name: str = f'[{self.caller}] ' if self.caller else ''
         currepted_string: str = '(CORRUPTED) ' if not self.crc_correct else ' '
@@ -96,7 +96,6 @@ class FSK_RX_Packet(RadioPacket):
 
 class FSK_TX_Packet(RadioPacket):
     mode: str = 'FSK'
-    caller: str = ''
     def __str__(self) -> str:
         caller_name: str = f'[{self.caller}] ' if self.caller else ''
         return f'{self.timestamp} {self.mode} {caller_name}\n'\

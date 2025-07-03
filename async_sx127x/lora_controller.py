@@ -186,7 +186,9 @@ class LoRa_Controller:
                             data_len=len(packet),
                             frequency=self.freq_hz,
                             Tpkt=packet_time,
-                            low_datarate_opt_flag=self.ldro)
+                            ldro=self.ldro,
+                            sf=self.spread_factor,
+                            bw=self.bandwidth)
 
     def _tx_frame(self, data: bytes, caller_name: str = '') -> LoRaTxPacket:
         frame: LoRaTxPacket = self.calculate_packet(data)
@@ -264,6 +266,7 @@ class LoRa_Controller:
         fei: int = await self.driver.get_lora_fei(bw)
         timestamp: str = datetime.now(UTC).isoformat(' ', 'milliseconds')
         snr, rssi = await self.driver.get_snr_and_rssi(self.freq_hz)
+        Tpkt: float = self.time_on_air(len(data))
         self._last_rx = LoRaRxPacket(timestamp=timestamp,
                                      data=bytes(data),
                                      data_len=len(data),
@@ -272,5 +275,9 @@ class LoRa_Controller:
                                      rssi_pkt=rssi,
                                      crc_correct=not crc_error,
                                      fei=fei,
-                                     caller=self._last_caller_name)
+                                     caller=self._last_caller_name,
+                                     Tpkt=Tpkt,
+                                     sf=self.spread_factor,
+                                     bw=self.bandwidth,
+                                     ldro=self.ldro)
         return self._last_rx
