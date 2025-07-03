@@ -206,15 +206,16 @@ class LoRa_Controller:
         retries = 0
 
         _ts_start: float = time.time()
+        timeout: float = period_sec
         while retries < max_retries:
             bdata: bytes = data() if isinstance(data, Callable) else data
             tx_packet: LoRaTxPacket = await self.send_single(bdata, caller_name)
+            if expected_len > 0:
+                timeout = (self.time_on_air(expected_len) + 20) / 1000
+            else:
+                timeout = period_sec - tx_packet.Tpkt / 1000
             last_tx_packet = tx_packet
             self._last_rx = None
-            if expected_len > 0:
-                timeout = self.time_on_air(expected_len) + 20
-            else:
-                timeout: float = period_sec - tx_packet.Tpkt / 1000
             try:
                 rx_packet: LoRaRxPacket = await asyncio.wait_for(self._wait_rx(),
                                                                  timeout)
@@ -236,7 +237,8 @@ class LoRa_Controller:
         transaction = LoraTransaction(request=last_tx_packet,
                                       answer=last_rx_packet,
                                       duration_ms=duration,
-                                      retries=retries)
+                                      retries=retries,
+                                      rx_timeout_ms=int(timeout * 1000))
         return transaction
 
     async def _wait_rx(self) -> LoRaRxPacket:

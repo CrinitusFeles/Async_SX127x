@@ -210,5 +210,6 @@ class FSK_Controller:
         transaction = FSK_Transaction(request=last_tx_packet,
                                       answer=last_rx_packet,
                                       duration_ms=duration,
-                                      retries=retries)
+                                      retries=retries,
+                                      rx_timeout_ms=int(period_sec * 1000))
         return transaction

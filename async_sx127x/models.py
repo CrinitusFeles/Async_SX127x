@@ -109,13 +109,14 @@ class LoraTransaction(BaseModel):
     answer: LoRaRxPacket | None = None
     retries: int = 0
     duration_ms: int = 0
-
+    rx_timeout_ms: int = 0
 
 class FSK_Transaction(BaseModel):
     request: FSK_TX_Packet | None = None
     answer: FSK_RX_Packet | None = None
     retries: int = 0
     duration_ms: int = 0
+    rx_timeout_ms: int = 0
 
 
 class RadioTransaction(BaseModel):
@@ -123,3 +124,4 @@ class RadioTransaction(BaseModel):
     answer: LoRaRxPacket | FSK_RX_Packet | None = None
     retries: int = 0
     duration_ms: int = 0
+    rx_timeout_ms: int = 0
