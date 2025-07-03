@@ -4,6 +4,7 @@ from typing import Awaitable, Callable, Coroutine, Iterable, Literal
 
 from loguru import logger
 from event import Event
+from pydantic import BaseModel
 from async_sx127x.driver import SX127x_Driver
 from async_sx127x.fsk_controller import FSK_Controller
 from async_sx127x.lora_controller import LoRa_Controller
@@ -17,6 +18,14 @@ async def ainput(prompt: str = "") -> str:
 
 ANSWER_CALLBACK = Callable[[LoRaRxPacket | FSK_RX_Packet, Iterable],
                            Awaitable[bool] | bool]
+
+
+class RadioTransaction(BaseModel):
+    request: LoRaTxPacket | FSK_TX_Packet | None = None
+    answer: LoRaRxPacket | FSK_RX_Packet | None = None
+    retries: int = 0
+    duration_ms: int = 0
+
 
 class RadioController:
     def __init__(self, mode: Literal['lora', 'fsk'] = 'lora', **kwargs) -> None:
@@ -115,14 +124,17 @@ class RadioController:
                           max_retries: int = 50,
                           answer_handler: ANSWER_CALLBACK | None = None,
                           handler_args: Iterable = (),
-                          caller_name: str = '') -> LoRaRxPacket | FSK_RX_Packet | None:
+                          expected_len: int = -1,
+                          caller_name: str = '') -> RadioTransaction:
         if self.tx_task and not self.tx_task.done():
             raise RuntimeError("TX task still active")
+
         coro: Coroutine = self.current_mode.send_repeat(data, period_sec,
                                                         untill_answer,
                                                         max_retries,
                                                         answer_handler,
                                                         handler_args,
+                                                        expected_len,
                                                         caller_name)
         self.tx_task = asyncio.create_task(coro)
         try:
@@ -232,9 +244,9 @@ async def test():
 
 if __name__ == '__main__':
     device: RadioController = RadioController('lora',
-                                              frequency=401_315_000,
-                                              sf=9,
-                                              bw=125,
+                                              frequency=436_500_000,
+                                              sf=11,
+                                              bw=250,
                                               tx_power=20)
     device.received.subscribe(on_received)
     device.transmited.subscribe(on_transmited)

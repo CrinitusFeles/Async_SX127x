@@ -2,9 +2,11 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, UTC
 from math import ceil
+import time
 from typing import Awaitable, Callable, Iterable
 from loguru import logger
 from event import Event
+from pydantic import BaseModel
 from async_sx127x.driver import SX127x_Driver
 from async_sx127x.models import (LoRaModel, LoRaRxPacket, LoRaTxPacket,
                                  RadioModel)
@@ -19,6 +21,14 @@ async def ainput(prompt: str = "") -> str:
 
 lock = asyncio.Lock()
 ANSWER_CALLBACK = Callable[[LoRaRxPacket, Iterable], Awaitable[bool] | bool]
+
+
+class LoraTransaction(BaseModel):
+    request: LoRaTxPacket | None = None
+    answer: LoRaRxPacket | None = None
+    retries: int = 0
+    duration_ms: int = 0
+
 
 class LoRa_Controller:
     freq_hz: int
@@ -156,16 +166,15 @@ class LoRa_Controller:
             await self.driver.reset_irq_flags()
         return tx_pkt
 
-    def calculate_packet(self, packet: bytes,
-                         force_optimization=True) -> LoRaTxPacket:
+    def time_on_air(self, packet_len: int) -> float:
         sf: int = self.spread_factor
         cr: int = self.coding_rate - 4
         if self.header_mode == SX127x_HeaderMode.IMPLICIT:
             payload_size = self.payload_length
         else:
-            payload_size: int = len(packet)
+            payload_size: int = packet_len
         t_sym: float = 2 ** sf / self.bandwidth  # ms
-        optimization_flag: bool = force_optimization#True if force_optimization else t_sym > 16
+        optimization_flag: bool = self.ldro#True if force_optimization else t_sym > 16
         preamble_time: float = (self.preamble_length + 4.25) * t_sym
         _tmp_1: int = 8 * payload_size - 4 * sf + 28
         _tmp_2: int = 16 * self.crc_mode - 20 * self.header_mode.value
@@ -174,13 +183,17 @@ class LoRa_Controller:
         payload_symbol_nb: float = 8 + max(_ceil * (4 + cr), 0)
         payload_time: float = payload_symbol_nb * t_sym
         packet_time: float = payload_time + preamble_time
+        return packet_time
+
+    def calculate_packet(self, packet: bytes) -> LoRaTxPacket:
+        packet_time: float = self.time_on_air(len(packet))
         timestamp: datetime = datetime.now().astimezone()
         return LoRaTxPacket(timestamp=timestamp.isoformat(' ', 'milliseconds'),
                             data=packet,
                             data_len=len(packet),
                             frequency=self.freq_hz,
                             Tpkt=packet_time,
-                            low_datarate_opt_flag=optimization_flag)
+                            low_datarate_opt_flag=self.ldro)
 
     def _tx_frame(self, data: bytes, caller_name: str = '') -> LoRaTxPacket:
         frame: LoRaTxPacket = self.calculate_packet(data)
@@ -193,14 +206,23 @@ class LoRa_Controller:
                           max_retries: int = 50,
                           handler: ANSWER_CALLBACK | None = None,
                           handler_args: Iterable = (),
-                          caller_name: str = '') -> LoRaRxPacket | None:
+                          expected_len: int = -1,
+                          caller_name: str = '') -> LoraTransaction:
         last_rx_packet: LoRaRxPacket | None = None
-        while max_retries:
+        last_tx_packet: LoRaTxPacket | None = None
+        retries = 0
+
+        _ts_start: float = time.time()
+        while retries < max_retries:
             bdata: bytes = data() if isinstance(data, Callable) else data
             tx_packet: LoRaTxPacket = await self.send_single(bdata, caller_name)
-            timeout: float = period_sec - tx_packet.Tpkt / 1000
+            last_tx_packet = tx_packet
+            self._last_rx = None
+            if expected_len > 0:
+                timeout = self.time_on_air(expected_len) + 20
+            else:
+                timeout: float = period_sec - tx_packet.Tpkt / 1000
             try:
-                self._last_rx = None
                 rx_packet: LoRaRxPacket = await asyncio.wait_for(self._wait_rx(),
                                                                  timeout)
                 last_rx_packet = rx_packet
@@ -216,8 +238,13 @@ class LoRa_Controller:
                         break
             except asyncio.TimeoutError:
                 logger.debug('LoRa Rx timeout')
-            max_retries -= 1
-        return last_rx_packet
+            retries += 1
+        duration = int((time.time() - _ts_start) * 1000)
+        transaction = LoraTransaction(request=last_tx_packet,
+                                      answer=last_rx_packet,
+                                      duration_ms=duration,
+                                      retries=retries)
+        return transaction
 
     async def _wait_rx(self) -> LoRaRxPacket:
         while not self._last_rx:

@@ -3,9 +3,11 @@
 import asyncio
 from asyncio import Lock, wait_for
 from datetime import datetime
+import time
 from typing import Awaitable, Callable, Iterable
 from loguru import logger
 from event import Event
+from pydantic import BaseModel
 from async_sx127x.driver import SX127x_Driver
 from async_sx127x.models import (FSK_Model, FSK_RX_Packet, FSK_TX_Packet,
                                  RadioModel)
@@ -16,6 +18,13 @@ from async_sx127x.registers import (SX127x_FSK_SHAPING, SX127x_RestartRxMode,
 
 lock = Lock()
 ANSWER_CALLBACK = Callable[[FSK_RX_Packet, Iterable], Awaitable[bool] | bool]
+
+
+class FSK_Transaction(BaseModel):
+    request: FSK_TX_Packet | None = None
+    answer: FSK_RX_Packet | None = None
+    retries: int = 0
+    duration_ms: int = 0
 
 
 class FSK_Controller:
@@ -179,27 +188,35 @@ class FSK_Controller:
                           max_retries: int = 50,
                           handler: ANSWER_CALLBACK | None = None,
                           handler_args: Iterable = (),
-                          caller_name: str = '') -> FSK_RX_Packet | None:
+                          expected_len: int = -1,
+                          caller_name: str = '') -> FSK_Transaction:
         last_rx_packet: FSK_RX_Packet | None = None
-        async with lock:
-            while max_retries:
-                bdata: bytes = data() if isinstance(data, Callable) else data
-                await self.send_single(bdata, caller_name)
-                try:
-                    rx_packet: FSK_RX_Packet = await wait_for(self._wait_rx(),
-                                                              period_sec)
-                    last_rx_packet = rx_packet
-                    if rx_packet.crc_correct and untill_answer:
-                        if handler:
-                            if asyncio.iscoroutinefunction(handler):
-                                if await handler(rx_packet, *handler_args):
-                                    break
-                            else:
-                                if handler(rx_packet, *handler_args):
-                                    break
+        last_tx_packet: FSK_TX_Packet | None = None
+        retries = 0
+        _ts_start = time.time()
+        while retries < max_retries:
+            bdata: bytes = data() if isinstance(data, Callable) else data
+            await self.send_single(bdata, caller_name)
+            try:
+                rx_packet: FSK_RX_Packet = await wait_for(self._wait_rx(),
+                                                            period_sec)
+                last_rx_packet = rx_packet
+                if rx_packet.crc_correct and untill_answer:
+                    if handler:
+                        if asyncio.iscoroutinefunction(handler):
+                            if await handler(rx_packet, *handler_args):
+                                break
                         else:
-                            break
-                except asyncio.TimeoutError:
-                    logger.debug('FSK Rx timeout')
-                max_retries -= 1
-            return last_rx_packet
+                            if handler(rx_packet, *handler_args):
+                                break
+                    else:
+                        break
+            except asyncio.TimeoutError:
+                logger.debug('FSK Rx timeout')
+            retries += 1
+        duration = int((time.time() - _ts_start) * 1000)
+        transaction = FSK_Transaction(request=last_tx_packet,
+                                      answer=last_rx_packet,
+                                      duration_ms=duration,
+                                      retries=retries)
+        return transaction
