@@ -4,12 +4,11 @@ from typing import Awaitable, Callable, Coroutine, Iterable, Literal
 
 from loguru import logger
 from event import Event
-from pydantic import BaseModel
 from async_sx127x.driver import SX127x_Driver
 from async_sx127x.fsk_controller import FSK_Controller
 from async_sx127x.lora_controller import LoRa_Controller
 from async_sx127x.models import (FSK_RX_Packet, FSK_TX_Packet, LoRaRxPacket,
-                                 LoRaTxPacket, RadioModel)
+                                 LoRaTxPacket, RadioModel, RadioTransaction)
 
 
 async def ainput(prompt: str = "") -> str:
@@ -18,13 +17,6 @@ async def ainput(prompt: str = "") -> str:
 
 ANSWER_CALLBACK = Callable[[LoRaRxPacket | FSK_RX_Packet, Iterable],
                            Awaitable[bool] | bool]
-
-
-class RadioTransaction(BaseModel):
-    request: LoRaTxPacket | FSK_TX_Packet | None = None
-    answer: LoRaRxPacket | FSK_RX_Packet | None = None
-    retries: int = 0
-    duration_ms: int = 0
 
 
 class RadioController:

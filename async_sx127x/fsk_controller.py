@@ -7,9 +7,8 @@ import time
 from typing import Awaitable, Callable, Iterable
 from loguru import logger
 from event import Event
-from pydantic import BaseModel
 from async_sx127x.driver import SX127x_Driver
-from async_sx127x.models import (FSK_Model, FSK_RX_Packet, FSK_TX_Packet,
+from async_sx127x.models import (FSK_Model, FSK_RX_Packet, FSK_TX_Packet, FSK_Transaction,
                                  RadioModel)
 from async_sx127x.registers import (SX127x_FSK_SHAPING, SX127x_RestartRxMode,
                                     SX127x_Mode, SX127x_Modulation,
@@ -18,13 +17,6 @@ from async_sx127x.registers import (SX127x_FSK_SHAPING, SX127x_RestartRxMode,
 
 lock = Lock()
 ANSWER_CALLBACK = Callable[[FSK_RX_Packet, Iterable], Awaitable[bool] | bool]
-
-
-class FSK_Transaction(BaseModel):
-    request: FSK_TX_Packet | None = None
-    answer: FSK_RX_Packet | None = None
-    retries: int = 0
-    duration_ms: int = 0
 
 
 class FSK_Controller:

@@ -102,3 +102,24 @@ class FSK_TX_Packet(RadioPacket):
         return f'{self.timestamp} {self.mode} {caller_name}\n'\
                f'Freq: {self.frequency:_}\n'\
                f'TX[{self.data_len}] > {self.data.hex(" ").upper()}'
+
+
+class LoraTransaction(BaseModel):
+    request: LoRaTxPacket | None = None
+    answer: LoRaRxPacket | None = None
+    retries: int = 0
+    duration_ms: int = 0
+
+
+class FSK_Transaction(BaseModel):
+    request: FSK_TX_Packet | None = None
+    answer: FSK_RX_Packet | None = None
+    retries: int = 0
+    duration_ms: int = 0
+
+
+class RadioTransaction(BaseModel):
+    request: LoRaTxPacket | FSK_TX_Packet | None = None
+    answer: LoRaRxPacket | FSK_RX_Packet | None = None
+    retries: int = 0
+    duration_ms: int = 0

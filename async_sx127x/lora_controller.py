@@ -6,9 +6,8 @@ import time
 from typing import Awaitable, Callable, Iterable
 from loguru import logger
 from event import Event
-from pydantic import BaseModel
 from async_sx127x.driver import SX127x_Driver
-from async_sx127x.models import (LoRaModel, LoRaRxPacket, LoRaTxPacket,
+from async_sx127x.models import (LoRaModel, LoRaRxPacket, LoRaTxPacket, LoraTransaction,
                                  RadioModel)
 from async_sx127x.registers import (SX127x_HeaderMode,
                                     SX127x_Modulation, SX127x_Registers)
@@ -22,12 +21,6 @@ async def ainput(prompt: str = "") -> str:
 lock = asyncio.Lock()
 ANSWER_CALLBACK = Callable[[LoRaRxPacket, Iterable], Awaitable[bool] | bool]
 
-
-class LoraTransaction(BaseModel):
-    request: LoRaTxPacket | None = None
-    answer: LoRaRxPacket | None = None
-    retries: int = 0
-    duration_ms: int = 0
 
 
 class LoRa_Controller:
