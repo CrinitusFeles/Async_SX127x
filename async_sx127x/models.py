@@ -104,7 +104,7 @@ class FSK_TX_Packet(RadioPacket):
 
 
 class BaseTransaction(BaseModel):
-    attempts: int = 0
+    retries: int = 0
     duration_ms: int = 0
     rx_timeout_ms: int = 0
 
