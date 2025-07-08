@@ -53,6 +53,7 @@ class FSK_Controller:
         self.label: str = kwargs.get('label', '')
         self._last_caller_name: str = ''
         self._transmited: Event = Event(FSK_TX_Packet)
+        self._extra_delay_ms = 0
 
     async def init(self, ax25_mode: bool = False) -> None:
         async with lock:
@@ -184,9 +185,9 @@ class FSK_Controller:
                           caller_name: str = '') -> FSK_Transaction:
         last_rx_packet: FSK_RX_Packet | None = None
         last_tx_packet: FSK_TX_Packet | None = None
-        retries = 0
+        attempts = 0
         _ts_start = time.time()
-        while retries < max_retries:
+        while attempts < max_retries:
             bdata: bytes = data() if isinstance(data, Callable) else data
             await self.send_single(bdata, caller_name)
             try:
@@ -205,11 +206,11 @@ class FSK_Controller:
                         break
             except asyncio.TimeoutError:
                 logger.debug('FSK Rx timeout')
-            retries += 1
+            attempts += 1
         duration = int((time.time() - _ts_start) * 1000)
         transaction = FSK_Transaction(request=last_tx_packet,
                                       answer=last_rx_packet,
                                       duration_ms=duration,
-                                      retries=retries,
+                                      attempts=attempts,
                                       rx_timeout_ms=int(period_sec * 1000))
         return transaction

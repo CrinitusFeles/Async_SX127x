@@ -69,6 +69,12 @@ class RadioController:
     def get_rx_buffer(self) -> list[LoRaRxPacket | FSK_RX_Packet]:
         return self._rx_buffer
 
+    def set_extra_delay(self, delay_ms: int) -> None:
+        self.current_mode._extra_delay_ms = delay_ms
+
+    def get_extra_delay(self) -> int:
+        return self.current_mode._extra_delay_ms
+
     async def read_config(self) -> RadioModel:
         return await self.current_mode.read_config()
 

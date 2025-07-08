@@ -1,6 +1,6 @@
 from __future__ import annotations
 import asyncio
-from datetime import datetime, UTC
+from datetime import datetime
 from math import ceil
 import time
 from typing import Awaitable, Callable, Iterable
@@ -58,6 +58,7 @@ class LoRa_Controller:
         self._transmited: Event = Event(LoRaTxPacket)
         self._last_caller_name: str = ''
         self._last_rx: LoRaRxPacket | None = None
+        self._extra_delay_ms = 0
 
     async def init(self)  -> None:
         async with lock:
@@ -205,15 +206,15 @@ class LoRa_Controller:
                           caller_name: str = '') -> LoraTransaction:
         last_rx_packet: LoRaRxPacket | None = None
         last_tx_packet: LoRaTxPacket | None = None
-        retries = 0
+        attempts = 0
 
         _ts_start: float = time.time()
         timeout: float = period_sec
-        while retries < max_retries:
+        while attempts < max_retries:
             bdata: bytes = data() if isinstance(data, Callable) else data
             tx_packet: LoRaTxPacket = await self.send_single(bdata, caller_name)
             if expected_len > 0:
-                timeout = (self.time_on_air(expected_len) + 20) / 1000
+                timeout = (self.time_on_air(expected_len) + self._extra_delay_ms) / 1000
             else:
                 timeout = period_sec - tx_packet.Tpkt / 1000
             last_tx_packet = tx_packet
@@ -234,12 +235,12 @@ class LoRa_Controller:
                         break
             except asyncio.TimeoutError:
                 logger.debug('LoRa Rx timeout')
-            retries += 1
+            attempts += 1
         duration = int((time.time() - _ts_start) * 1000)
         transaction = LoraTransaction(request=last_tx_packet,
                                       answer=last_rx_packet,
                                       duration_ms=duration,
-                                      retries=retries,
+                                      attempts=attempts,
                                       rx_timeout_ms=int(timeout * 1000))
         return transaction
 
@@ -264,7 +265,7 @@ class LoRa_Controller:
         await self.driver.reset_irq_flags()
         bw: float | int = await self.driver.get_lora_bandwidth()
         fei: int = await self.driver.get_lora_fei(bw)
-        timestamp: str = datetime.now(UTC).isoformat(' ', 'milliseconds')
+        timestamp: str = datetime.now().astimezone().isoformat(' ', 'milliseconds')
         snr, rssi = await self.driver.get_snr_and_rssi(self.freq_hz)
         Tpkt: float = self.time_on_air(len(data))
         self._last_rx = LoRaRxPacket(timestamp=timestamp,
