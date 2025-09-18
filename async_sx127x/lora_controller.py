@@ -58,7 +58,7 @@ class LoRa_Controller:
         self._transmited: Event = Event(LoRaTxPacket)
         self._last_caller_name: str = ''
         self._last_rx: LoRaRxPacket | None = None
-        self._extra_delay_ms = 0
+        self._extra_delay_ms = 30
 
     async def init(self)  -> None:
         async with lock:
@@ -221,7 +221,7 @@ class LoRa_Controller:
             self._last_rx = None
             try:
                 rx_packet: LoRaRxPacket = await asyncio.wait_for(self._wait_rx(),
-                                                                 timeout)
+                                                                 timeout + tx_packet.Tpkt)
                 last_rx_packet = rx_packet
                 if rx_packet.crc_correct and untill_answer:
                     if handler:
