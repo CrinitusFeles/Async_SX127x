@@ -215,13 +215,14 @@ class LoRa_Controller:
             tx_packet: LoRaTxPacket = await self.send_single(bdata, caller_name)
             if expected_len > 0:
                 timeout = (self.time_on_air(expected_len) + self._extra_delay_ms) / 1000
+                timeout += tx_packet.Tpkt / 1000
             else:
                 timeout = period_sec - tx_packet.Tpkt / 1000
             last_tx_packet = tx_packet
             self._last_rx = None
             try:
                 rx_packet: LoRaRxPacket = await asyncio.wait_for(self._wait_rx(),
-                                                                 timeout + tx_packet.Tpkt)
+                                                                 timeout)
                 last_rx_packet = rx_packet
                 if rx_packet.crc_correct and untill_answer:
                     if handler:
