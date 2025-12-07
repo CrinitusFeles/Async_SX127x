@@ -33,6 +33,8 @@ class RadioController:
         self.fsk._transmited.subscribe(self._on_transmited)
         self.received: Event = Event(LoRaRxPacket | FSK_RX_Packet)
         self.transmited: Event = Event(LoRaTxPacket | FSK_TX_Packet)
+        self.tx_started: Event = Event()
+        self.tx_finished: Event = Event()
         self._tx_buffer: list[LoRaTxPacket | FSK_TX_Packet] = []
         self._rx_buffer: list[LoRaRxPacket | FSK_RX_Packet] = []
         self.tx_task: asyncio.Task | None = None
@@ -136,11 +138,14 @@ class RadioController:
                                                         caller_name)
         self.tx_task = asyncio.create_task(coro)
         try:
+            self.tx_started.emit()
             result = await self.tx_task
             self.tx_task = None
+            self.tx_finished.emit()
         except asyncio.CancelledError as err:
             logger.debug('TX task was cancelled')
             self.tx_task = None
+            self.tx_finished.emit()
             raise err
         return result
 
@@ -163,7 +168,7 @@ class RadioController:
                 pkt = await self.current_mode.check_rx_input()
                 if pkt:
                     self.current_mode._last_caller_name = ''
-                    logger.debug(pkt)
+                    # logger.debug(pkt)
                     self._rx_buffer.append(pkt)
                     self.received.emit(pkt)
         except (RuntimeError, ConnectionResetError) as err:
@@ -223,14 +228,25 @@ class RadioController:
                 bdata: bytes = bytes.fromhex(data)
                 await self.send_single(bdata)
             except (SyntaxError, ValueError):
-                await self.send_single(data.encode())
+                await self.send_single(bytes.fromhex('1F010668656C700A0D1C7E'))
 
 
 def on_received(data: LoRaRxPacket | FSK_RX_Packet):
-    print(data)
+    try:
+        print(data.data[5:].decode(), end = '', sep='')
+    except:
+        buff = ''
+        for b in data.data[5:]:
+            try:
+                buff += chr(b)
+            except Exception as err:
+                # print(err)
+                ...
+        print(buff)
 
 async def on_transmited(data: LoRaTxPacket | FSK_TX_Packet):
     print(data)
+
 
 async def test():
     if await device.connect(port_or_ip='COM25'):  # 192.168.0.5:80
@@ -241,9 +257,10 @@ async def test():
 
 if __name__ == '__main__':
     device: RadioController = RadioController('lora',
-                                              frequency=436_500_000,
-                                              sf=11,
-                                              bw=250,
+                                              frequency=435_700_000,
+                                              sf=12,
+                                              bw=125,
+                                              ldro=True,
                                               tx_power=20)
     device.received.subscribe(on_received)
     device.transmited.subscribe(on_transmited)
