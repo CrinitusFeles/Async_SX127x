@@ -147,6 +147,11 @@ class RadioController:
             self.tx_task = None
             self.tx_finished.emit()
             raise err
+        except RuntimeError as err:
+            logger.exception(err)
+            self.tx_task = None
+            self.tx_finished.emit()
+            raise err
         return result
 
     async def cancel_tx(self) -> bool:
