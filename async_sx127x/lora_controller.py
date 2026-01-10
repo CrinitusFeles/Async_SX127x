@@ -223,7 +223,9 @@ class LoRa_Controller:
             try:
                 rx_packet: LoRaRxPacket = await asyncio.wait_for(self._wait_rx(),
                                                                  timeout)
-                if rx_packet.crc_correct and untill_answer:
+                if not untill_answer:
+                    last_rx_packet = rx_packet
+                elif rx_packet.crc_correct and untill_answer:
                     if handler:
                         if asyncio.iscoroutinefunction(handler):
                             if await handler(rx_packet, *handler_args):
