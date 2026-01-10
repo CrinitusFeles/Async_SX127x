@@ -223,16 +223,18 @@ class LoRa_Controller:
             try:
                 rx_packet: LoRaRxPacket = await asyncio.wait_for(self._wait_rx(),
                                                                  timeout)
-                last_rx_packet = rx_packet
                 if rx_packet.crc_correct and untill_answer:
                     if handler:
                         if asyncio.iscoroutinefunction(handler):
                             if await handler(rx_packet, *handler_args):
+                                last_rx_packet = rx_packet
                                 break
                         else:
                             if handler(rx_packet, *handler_args):
+                                last_rx_packet = rx_packet
                                 break
                     else:
+                        last_rx_packet = rx_packet
                         break
             except asyncio.TimeoutError:
                 logger.debug('LoRa Rx timeout')
@@ -283,3 +285,23 @@ class LoRa_Controller:
                                      bw=self.bandwidth,
                                      ldro=self.ldro)
         return self._last_rx
+
+if __name__ == '__main__':
+
+    def time_on_air(packet_len: int) -> float:
+        sf: int = 10
+        cr: int = 1
+        payload_size: int = packet_len
+        t_sym: float = 2 ** sf / 125  # ms
+        optimization_flag: bool = True  #True if force_optimization else t_sym > 16
+        preamble_time: float = (8 + 4.25) * t_sym
+        _tmp_1: int = 8 * payload_size - 4 * sf + 28
+        _tmp_2: int = 16 * 1 - 20 * 0
+        _devider: int = (4 * (sf - 2 * optimization_flag))
+        _ceil: int = ceil((_tmp_1 + _tmp_2) / _devider)
+        payload_symbol_nb: float = 8 + max(_ceil * (4 + cr), 0)
+        payload_time: float = payload_symbol_nb * t_sym
+        packet_time: float = payload_time + preamble_time
+        return round(packet_time, 3)
+
+    print(time_on_air(143))
