@@ -136,7 +136,8 @@ class RadioController:
                                                         handler_args,
                                                         expected_len,
                                                         caller_name)
-        self.tx_task = asyncio.create_task(coro)
+        task_name = f'_({caller_name})' if caller_name else ''
+        self.tx_task = asyncio.create_task(coro, name=f'radio_tx_task{task_name}')
         try:
             self.tx_started.emit()
             result = await self.tx_task
