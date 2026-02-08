@@ -38,6 +38,8 @@ class RadioController:
         self._tx_buffer: list[LoRaTxPacket | FSK_TX_Packet] = []
         self._rx_buffer: list[LoRaRxPacket | FSK_RX_Packet] = []
         self.tx_task: asyncio.Task | None = None
+        self._rx_running: bool = False
+        self._wait_for_finish: bool = False
 
     def connection_status(self) -> bool:
         return self.driver.interface.connection_status
@@ -167,10 +169,18 @@ class RadioController:
     async def check_rx_input(self) -> LoRaRxPacket | FSK_RX_Packet | None:
         return await self.current_mode.check_rx_input()
 
+    async def finish_rx_routine(self) -> None:
+        self._wait_for_finish = True
+        self._rx_running = False
+        while self._wait_for_finish:
+            logger.debug('Waiting for RX task finished...')
+            await asyncio.sleep(0.03)
+
     async def rx_routine(self) -> None:
         pkt: LoRaRxPacket | FSK_RX_Packet | None = None
+        self._rx_running = True
         try:
-            while True:
+            while self._rx_running:
                 pkt = await self.current_mode.check_rx_input()
                 if pkt:
                     self.current_mode._last_caller_name = ''
@@ -178,9 +188,13 @@ class RadioController:
                     self._rx_buffer.append(pkt)
                     self.received.emit(pkt)
         except (RuntimeError, ConnectionResetError) as err:
-            logger.error(err)
+            logger.error(f'Radio RX task error: {err}')
         except asyncio.CancelledError:
             logger.debug('Radio RX task cancelled')
+        else:
+            logger.debug('Radio RX task finished')
+        self._rx_running = False
+        self._wait_for_finish = False
 
     async def set_frequency(self, new_freq_hz: int) -> None:
         await self.current_mode.driver.set_frequency(new_freq_hz)
