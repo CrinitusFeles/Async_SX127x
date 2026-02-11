@@ -184,7 +184,7 @@ class RadioController:
                 pkt = await self.current_mode.check_rx_input()
                 if pkt:
                     self.current_mode._last_caller_name = ''
-                    # logger.debug(pkt)
+                    logger.debug(pkt)
                     self._rx_buffer.append(pkt)
                     self.received.emit(pkt)
         except (RuntimeError, ConnectionResetError) as err:
@@ -254,12 +254,12 @@ class RadioController:
 def on_received(data: LoRaRxPacket | FSK_RX_Packet):
     try:
         print(data.data[5:].decode(), end = '', sep='')
-    except:
+    except Exception:
         buff = ''
         for b in data.data[5:]:
             try:
                 buff += chr(b)
-            except Exception as err:
+            except Exception:
                 # print(err)
                 ...
         print(buff)
