@@ -169,12 +169,20 @@ class RadioController:
     async def check_rx_input(self) -> LoRaRxPacket | FSK_RX_Packet | None:
         return await self.current_mode.check_rx_input()
 
-    async def finish_rx_routine(self) -> None:
+    async def finish_rx_routine(self) -> bool:
+        try:
+            await asyncio.wait_for(self.__finish_rx_routine, timeout=1)
+            return True
+        except asyncio.TimeoutError:
+            logger.error("Failed to finish radio rx routine")
+            return False
+
+    async def __finish_rx_routine(self) -> None:
         self._wait_for_finish = True
         self._rx_running = False
         while self._wait_for_finish:
             logger.debug('Waiting for RX task finished...')
-            await asyncio.sleep(0.03)
+            await asyncio.sleep(0.05)
 
     async def rx_routine(self) -> None:
         pkt: LoRaRxPacket | FSK_RX_Packet | None = None
@@ -184,7 +192,7 @@ class RadioController:
                 pkt = await self.current_mode.check_rx_input()
                 if pkt:
                     self.current_mode._last_caller_name = ''
-                    logger.debug(pkt)
+                    # logger.debug(pkt)
                     self._rx_buffer.append(pkt)
                     self.received.emit(pkt)
         except (RuntimeError, ConnectionResetError) as err:
@@ -254,12 +262,12 @@ class RadioController:
 def on_received(data: LoRaRxPacket | FSK_RX_Packet):
     try:
         print(data.data[5:].decode(), end = '', sep='')
-    except Exception:
+    except:
         buff = ''
         for b in data.data[5:]:
             try:
                 buff += chr(b)
-            except Exception:
+            except Exception as err:
                 # print(err)
                 ...
         print(buff)
