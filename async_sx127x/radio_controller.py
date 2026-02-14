@@ -170,11 +170,14 @@ class RadioController:
         return await self.current_mode.check_rx_input()
 
     async def finish_rx_routine(self) -> bool:
+        if not self._rx_running:
+            return True
         try:
             await asyncio.wait_for(self.__finish_rx_routine, timeout=1)
             return True
         except asyncio.TimeoutError:
             logger.error("Failed to finish radio rx routine")
+            self._wait_for_finish = False
             return False
 
     async def __finish_rx_routine(self) -> None:
