@@ -132,8 +132,8 @@ class FSK_Controller:
                              frequency=self.freq_hz,
                              caller=caller_name)
 
-    async def send_single(self, data: bytes,
-                          caller_name: str = '') -> FSK_TX_Packet:
+    async def send_single(self, data: bytes, caller_name: str = '',
+                          attempt: int = 0) -> FSK_TX_Packet:
         async with lock:
             await self.driver.interface.write_fsk_read()
             await self.driver.set_standby_mode()

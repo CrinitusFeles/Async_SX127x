@@ -162,9 +162,9 @@ class RadioController:
             return self.tx_task.cancel()
         return False
 
-    async def send_single(self, data: bytes,
-                          caller_name: str = '') -> LoRaTxPacket | FSK_TX_Packet:
-        return await self.current_mode.send_single(data, caller_name)
+    async def send_single(self, data: bytes, caller_name: str = '',
+                          attempt: int = 0) -> LoRaTxPacket | FSK_TX_Packet:
+        return await self.current_mode.send_single(data, caller_name, attempt)
 
     async def check_rx_input(self) -> LoRaRxPacket | FSK_RX_Packet | None:
         return await self.current_mode.check_rx_input()
@@ -280,7 +280,7 @@ async def on_transmited(data: LoRaTxPacket | FSK_TX_Packet):
 
 
 async def test():
-    if await device.connect(port_or_ip='COM25'):  # 192.168.0.5:80
+    if await device.connect(port_or_ip='COM11'):  # 192.168.0.5:80
         print(await device.read_config())
         asyncio.create_task(device.rx_routine())
         await device.user_cli()
@@ -288,7 +288,7 @@ async def test():
 
 if __name__ == '__main__':
     device: RadioController = RadioController('lora',
-                                              frequency=435_700_000,
+                                              frequency=436_500_000,
                                               sf=12,
                                               bw=125,
                                               ldro=True,

@@ -143,9 +143,10 @@ class LoRa_Controller:
             await asyncio.sleep((tx_chunk.Tpkt + 10) / 1000)
 
     async def send_single(self, data: bytes,
-                          caller_name: str = '') -> LoRaTxPacket:
+                          caller_name: str = '', attempt: int = 0) -> LoRaTxPacket:
         buffer_size: int = 255
         tx_pkt: LoRaTxPacket = self.calculate_packet(data)
+        tx_pkt.attempt = attempt
         tx_pkt.caller = caller_name
         self._last_caller_name = caller_name
         logger.debug(f'{self.label} {tx_pkt}')
@@ -212,8 +213,7 @@ class LoRa_Controller:
         timeout: float = period_sec
         while retries < max_retries:
             bdata: bytes = data() if isinstance(data, Callable) else data
-            tx_packet: LoRaTxPacket = await self.send_single(bdata, caller_name)
-            tx_packet.attempt = retries
+            tx_packet: LoRaTxPacket = await self.send_single(bdata, caller_name, retries)
             if expected_len > 0:
                 timeout = (self.time_on_air(expected_len) + self._extra_delay_ms) / 1000
                 timeout += tx_packet.Tpkt / 1000

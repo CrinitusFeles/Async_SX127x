@@ -109,6 +109,7 @@ class FSK_RX_Packet(RadioPacket):
 
 class FSK_TX_Packet(RadioPacket):
     mode: str = 'FSK'
+    attempt: int = 0
     def __str__(self) -> str:
         caller_name: str = f'[{self.caller}] ' if self.caller else ''
         return f'{self.timestamp}    TX    {self.mode} {caller_name:<30}   '\
