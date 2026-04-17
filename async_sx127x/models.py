@@ -62,16 +62,16 @@ class LoRaRxPacket(BaseLoRaPacket):
     fei: int
     def __str__(self) -> str:
         caller_name: str = f'[{self.caller}] ' if self.caller else ' '
-        currepted_string: str = ' (CORRUPTED) ' if not self.crc_correct else ' '
-        return f'{self.timestamp}    RX{currepted_string}   '\
-               f'{self.mode} {caller_name}    '\
+        currepted_string: str = '(CORRUPTED)    ' if not self.crc_correct else ''
+        return f'{self.timestamp}    RX    {currepted_string}'\
+               f'{self.mode} {caller_name:<30}  '\
                f'Freq: {self.frequency:_}    '\
-               f'FEI: {self.fei}    '\
-               f'RSSI: {self.rssi_pkt}    '\
-               f'SNR: {self.snr}    '\
-               f'SF: {self.sf}    '\
-               f'ToF(ms): {round(self.Tpkt)}    '\
-               f'BW: {self.bw}    '\
+               f'FEI: {self.fei:<6}    '\
+               f'RSSI: {self.rssi_pkt:<4}    '\
+               f'SNR: {self.snr:<3}    '\
+               f'SF: {self.sf:<2}    '\
+               f'BW: {self.bw:<4}    '\
+               f'ToF(ms): {round(self.Tpkt):<6}    '\
                f'RX[{self.data_len}] < {self.data.hex(" ").upper()}'
 
     def __repr__(self) -> str:
@@ -80,12 +80,12 @@ class LoRaRxPacket(BaseLoRaPacket):
 class LoRaTxPacket(BaseLoRaPacket):
     attempt: int = 0
     def __str__(self) -> str:
-        caller_name: str = f'[{self.caller}] ' if self.caller else ''
-        return f'{self.timestamp}    TX    {self.mode} {caller_name}    '\
+        caller_name: str = f'[{self.caller}]' if self.caller else ''
+        return f'{self.timestamp}    TX    {self.mode} {caller_name:<30}   '\
                f'Freq: {self.frequency:_}    '\
-               f'SF: {self.sf}    '\
-               f'BW: {self.bw}    '\
-               f'ToF(ms): {round(self.Tpkt)}    '\
+               f'SF: {self.sf:<2}    '\
+               f'BW: {self.bw:<4}    '\
+               f'ToF(ms): {round(self.Tpkt):<6}    '\
                f'TX[{self.data_len}] > {self.data.hex(" ").upper()}'
 
     def __repr__(self) -> str:
@@ -97,20 +97,20 @@ class FSK_RX_Packet(RadioPacket):
     crc_correct: bool
     mode: str = 'FSK'
     def __str__(self) -> str:
-        caller_name: str = f'[{self.caller}] ' if self.caller else ''
+        caller_name: str = f'[{self.caller:<30}]' if self.caller else ''
         currepted_string: str = '(CORRUPTED) ' if not self.crc_correct else ' '
-        return f'{self.timestamp}\n'\
-               f'{self.mode} {caller_name} {currepted_string}\n'\
-               f'Freq: {self.frequency:_}\n'\
-               f'RSSI: {self.rssi_pkt}\n'\
+        return f'{self.timestamp}    RX    {currepted_string}'\
+               f'{self.mode} {caller_name:<30}   '\
+               f'Freq: {self.frequency:_}    '\
+               f'RSSI: {self.rssi_pkt:<4}    '\
                f'RX[{self.data_len}] < {self.data.hex(" ").upper()}'
 
 class FSK_TX_Packet(RadioPacket):
     mode: str = 'FSK'
     def __str__(self) -> str:
         caller_name: str = f'[{self.caller}] ' if self.caller else ''
-        return f'{self.timestamp} {self.mode} {caller_name}\n'\
-               f'Freq: {self.frequency:_}\n'\
+        return f'{self.timestamp}    TX    {self.mode} {caller_name:<30}   '\
+               f'Freq: {self.frequency:_} '\
                f'TX[{self.data_len}] > {self.data.hex(" ").upper()}'
 
 
