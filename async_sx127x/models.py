@@ -51,7 +51,7 @@ class RadioPacket(BaseModel):
 class BaseLoRaPacket(RadioPacket):
     mode: str = 'LoRa'
     sf: int
-    bw: int | float
+    bw: float
     ldro: bool
     Tpkt: float
 
@@ -62,23 +62,34 @@ class LoRaRxPacket(BaseLoRaPacket):
     fei: int
     def __str__(self) -> str:
         caller_name: str = f'[{self.caller}] ' if self.caller else ' '
-        currepted_string: str = '(CORRUPTED) ' if not self.crc_correct else ' '
-        return f'{self.timestamp}\n'\
-               f'{self.mode} {caller_name} {currepted_string}\n'\
-               f'Freq: {self.frequency:_}\n'\
-               f'FEI: {self.fei}\n'\
-               f'RSSI: {self.rssi_pkt}\n'\
-               f'SNR: {self.snr};\n'\
+        currepted_string: str = ' (CORRUPTED) ' if not self.crc_correct else ' '
+        return f'{self.timestamp} RX{currepted_string}'\
+               f'{self.mode} {caller_name} '\
+               f'Freq: {self.frequency:_} '\
+               f'FEI: {self.fei} '\
+               f'RSSI: {self.rssi_pkt} '\
+               f'SNR: {self.snr} '\
+               f'SF: {self.sf} '\
+               f'ToF(ms): {round(self.Tpkt)} '\
+               f'BW: {self.bw}'\
                f'RX[{self.data_len}] < {self.data.hex(" ").upper()}'
 
+    def __repr__(self) -> str:
+        return self.__str__()
 
 class LoRaTxPacket(BaseLoRaPacket):
+    attempt: int = 0
     def __str__(self) -> str:
         caller_name: str = f'[{self.caller}] ' if self.caller else ''
-        return f'{self.timestamp}\n{self.mode} {caller_name}\n'\
-               f'Freq: {self.frequency:_}\n'\
-               f'TOF(ms): {round(self.Tpkt)};\n'\
+        return f'{self.timestamp} TX {self.mode} {caller_name}'\
+               f'Freq: {self.frequency:_} '\
+               f'SF: {self.sf} '\
+               f'BW: {self.bw} '\
+               f'ToF(ms): {round(self.Tpkt)} '\
                f'TX[{self.data_len}] > {self.data.hex(" ").upper()}'
+
+    def __repr__(self) -> str:
+        return self.__str__()
 
 
 class FSK_RX_Packet(RadioPacket):
