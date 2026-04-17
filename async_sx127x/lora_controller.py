@@ -213,6 +213,7 @@ class LoRa_Controller:
         while retries < max_retries:
             bdata: bytes = data() if isinstance(data, Callable) else data
             tx_packet: LoRaTxPacket = await self.send_single(bdata, caller_name)
+            tx_packet.attempt = retries
             if expected_len > 0:
                 timeout = (self.time_on_air(expected_len) + self._extra_delay_ms) / 1000
                 timeout += tx_packet.Tpkt / 1000

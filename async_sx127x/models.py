@@ -72,7 +72,7 @@ class LoRaRxPacket(BaseLoRaPacket):
                f'SF: {self.sf:<2}    '\
                f'BW: {self.bw:<4}    '\
                f'ToF(ms): {round(self.Tpkt):<6}    '\
-               f'RX[{self.data_len}] < {self.data.hex(" ").upper()}'
+               f'RX[{self.data_len:^3}] < {self.data.hex(" ").upper()}'
 
     def __repr__(self) -> str:
         return self.__str__()
@@ -81,12 +81,14 @@ class LoRaTxPacket(BaseLoRaPacket):
     attempt: int = 0
     def __str__(self) -> str:
         caller_name: str = f'[{self.caller}]' if self.caller else ''
-        return f'{self.timestamp}    TX    {self.mode} {caller_name:<30}   '\
+        return f'{self.timestamp}    TX    {self.mode} {caller_name:<30}  '\
                f'Freq: {self.frequency:_}    '\
+               f'Try: {self.attempt:<10}'\
+               f'{" ":<26}'\
                f'SF: {self.sf:<2}    '\
                f'BW: {self.bw:<4}    '\
                f'ToF(ms): {round(self.Tpkt):<6}    '\
-               f'TX[{self.data_len}] > {self.data.hex(" ").upper()}'
+               f'TX[{self.data_len:^3}] > {self.data.hex(" ").upper()}'
 
     def __repr__(self) -> str:
         return self.__str__()
@@ -103,7 +105,7 @@ class FSK_RX_Packet(RadioPacket):
                f'{self.mode} {caller_name:<30}   '\
                f'Freq: {self.frequency:_}    '\
                f'RSSI: {self.rssi_pkt:<4}    '\
-               f'RX[{self.data_len}] < {self.data.hex(" ").upper()}'
+               f'RX[{self.data_len:^3}] < {self.data.hex(" ").upper()}'
 
 class FSK_TX_Packet(RadioPacket):
     mode: str = 'FSK'
@@ -111,7 +113,7 @@ class FSK_TX_Packet(RadioPacket):
         caller_name: str = f'[{self.caller}] ' if self.caller else ''
         return f'{self.timestamp}    TX    {self.mode} {caller_name:<30}   '\
                f'Freq: {self.frequency:_} '\
-               f'TX[{self.data_len}] > {self.data.hex(" ").upper()}'
+               f'TX[{self.data_len:^3}] > {self.data.hex(" ").upper()}'
 
 
 class BaseTransaction(BaseModel):
